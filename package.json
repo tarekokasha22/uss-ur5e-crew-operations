@@ -4,6 +4,14 @@
   "private": true,
   "description": "Browser-based USS UR5e ship operations sim — GIU Robotics Lab IR project: crew AI, mess-hall chill scripts, dossiers, day/night loop, vanilla JS + Canvas.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tarekokasha22/uss-ur5e-crew-operations.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tarekokasha22/uss-ur5e-crew-operations/issues"
+  },
+  "homepage": "https://github.com/tarekokasha22/uss-ur5e-crew-operations#readme",
   "scripts": {
     "start": "python3 -m http.server 8765",
     "serve": "python3 -m http.server 8765"

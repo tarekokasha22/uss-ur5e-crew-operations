@@ -5,6 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Stack](https://img.shields.io/badge/stack-HTML5%20%2B%20Vanilla%20JS-orange)](https://developer.mozilla.org/docs/Web/HTML)
 [![No build](https://img.shields.io/badge/build-none-success)](README.md)
+[![GitHub](https://img.shields.io/badge/GitHub-repository-181717?logo=github)](https://github.com/tarekokasha22/uss-ur5e-crew-operations)
+
+**Repository:** [github.com/tarekokasha22/uss-ur5e-crew-operations](https://github.com/tarekokasha22/uss-ur5e-crew-operations)
 
 ## Highlights
 
@@ -37,10 +40,13 @@ npx --yes serve -l 8765
 
 ## GitHub Pages (optional)
 
-1. Repository → **Settings** → **Pages** → Source: **Deploy from a branch** → Branch `main` / folder `/ (root)`.
-2. After the workflow or build completes, the site is served from `https://<user>.github.io/<repo>/`.
+1. Open **Settings → Pages** on the repository.
+2. Under **Build and deployment**, set source to **Deploy from a branch**, branch **`main`**, folder **`/ (root)`**.
+3. After deployment, the site is available at:
 
-For a **project site** at `username.github.io/repo-name/`, ensure asset paths are relative (this project uses relative `href`/`src` paths).
+   **`https://tarekokasha22.github.io/uss-ur5e-crew-operations/`**
+
+Asset paths in this project are relative, so it works as a project site under that URL.
 
 ## Repository layout
 
