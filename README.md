@@ -22,7 +22,7 @@
 No install or bundler required — any static file server works.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/uss-ur5e-crew-operations.git
+git clone https://github.com/tarekokasha22/uss-ur5e-crew-operations.git
 cd uss-ur5e-crew-operations
 python3 -m http.server 8765
 ```
