@@ -48,7 +48,7 @@ function pickMessPrunedForOcc(occIds){
     var pos = (_messConvoPtr + attempt) % n;
     var convoIdx = _messConvoDeck[pos];
     var pruned = C.CHILL_CONVOS[convoIdx].filter(function(line){ return occIds.indexOf(line.id) !== -1; });
-    if(pruned.length >= 2){
+    if(pruned.length >= 1){
       var nextPtr = (pos + 1) % n;
       if(nextPtr === 0) shuffleInPlaceCh(_messConvoDeck);
       _messConvoPtr = nextPtr;
@@ -58,7 +58,7 @@ function pickMessPrunedForOcc(occIds){
   var eligible = [];
   C.CHILL_CONVOS.forEach(function(convo){
     var p = convo.filter(function(line){ return occIds.indexOf(line.id) !== -1; });
-    if(p.length >= 2) eligible.push(p);
+    if(p.length >= 1) eligible.push(p);
   });
   if(!eligible.length) return null;
   shuffleInPlaceCh(eligible);
@@ -77,7 +77,69 @@ function pickNextMoazConvoBlock(){
   return mo[idx];
 }
 
+function mergeExportedRoomChatsIntoChillConvos(){
+  if(C._mergedRoomChatConvos || !GAME.roomChatExport) return;
+  C._mergedRoomChatConvos = true;
+  var RC = GAME.roomChatExport;
+  var roomPools = {
+    medbay_mess: ['carol','tarek','omar','mohamed','seif','abdelrahman','youssef_emad','robot'],
+    bridge: ['jomana','carol','maryam','robot','tarek'],
+    chiefs_office: ['maryam','jomana','tolba','zaky'],
+    comms_array: ['carol','jomana','robot','tarek','maryam'],
+    patrons_suite: ['zaky','tolba','jomana','maryam'],
+    captains_cabin: ['tolba','jomana','maryam','zaky'],
+    cargo_hold: ['robot','tarek','omar','mohamed'],
+    engineering_bay: ['seif','omar','mohamed','tarek'],
+    voice_synth: ['tarek','abdelrahman','mohamed','robot'],
+    ta_lab: ['moaz','hemaly','tarek','robot'],
+    reactor_core: ['hemaly','moaz','seif','robot'],
+    airlock_observation: ['zaky','maryam','omar','carol'],
+  };
+  var counter = 0;
+  Object.keys(roomPools).forEach(function(rid){
+    var pool = roomPools[rid];
+    var rows = RC[rid] || [];
+    rows.forEach(function(row){
+      if(!row || !row.length) return;
+      var convo = [];
+      row.forEach(function(text, li){
+        var id = pool[(counter + li) % pool.length];
+        convo.push({ id: id, text: String(text), delay: li === 0 ? 0 : 1750 + li * 170 });
+      });
+      counter++;
+      if(convo.length) C.CHILL_CONVOS.push(convo);
+    });
+  });
+}
+
+function mergeScriptedScenesIntoChillConvos(){
+  if(C._mergedScriptedConvos || !GAME.scriptedScenesExport) return;
+  C._mergedScriptedConvos = true;
+  var ack = {
+    jomana: 'Copy. On it.', maryam: 'Logged.', tolba: 'Understood.', robot: '[ACK] Received.',
+    tarek: 'Noted.', moaz: 'Yeah yeah.', hemaly: 'Fine.', seif: 'Cool.', omar: 'Roger.', zaky: 'Excellent.',
+    carol: 'Comms clear.',
+  };
+  GAME.scriptedScenesExport.forEach(function(s){
+    if(!s || !s.from || !s.text) return;
+    var block = [{ id: s.from, text: s.text, delay: 0 }];
+    if(s.to){
+      block.push({ id: s.to, text: ack[s.to] || 'Roger.', delay: 2200 });
+    }
+    C.CHILL_CONVOS.push(block);
+  });
+}
+
+var _allChillLinesCache = null;
+var _chillBySpeakerCache = null;
+
+C.invalidateChillScriptCaches = function(){
+  _allChillLinesCache = null;
+  _chillBySpeakerCache = null;
+};
+
 C.resetChillVariety = function(){
+  C.invalidateChillScriptCaches();
   rebuildMessConvoOrder();
   rebuildMoazConvoOrder();
   _speakerLineDecks = {};
@@ -90,6 +152,14 @@ C.init = function(){
   chillConvoActive = false;
   pendingChillLines = [];
   chillGapMs = 0;
+  if(GAME.EXTRA_CHILL_CONVOS && Array.isArray(GAME.EXTRA_CHILL_CONVOS) && !C._extraChillConvosApplied){
+    C._extraChillConvosApplied = true;
+    GAME.EXTRA_CHILL_CONVOS.forEach(function(block){
+      if(Array.isArray(block) && block.length) C.CHILL_CONVOS.push(block);
+    });
+  }
+  mergeExportedRoomChatsIntoChillConvos();
+  mergeScriptedScenesIntoChillConvos();
   C.resetChillVariety();
 };
 
@@ -129,7 +199,7 @@ C.update = function(dt){
       } else {
         chillConvoTimer = 0;
         if(GAME.ai && GAME.ai.chillTimeActive){
-          chillGapMs = 1200 + Math.random() * 2200;
+          chillGapMs = 700 + Math.random() * 1400;
         }
       }
     }
@@ -172,7 +242,9 @@ function chillOccupantsNow(){
 }
 
 // ─── CHILL ROOM CONVERSATIONS ────────────────────────────────────────
-// Triggered when 2+ crew in medbay_mess (not Jomana)
+// Triggered when 2+ crew in medbay_mess (not Jomana). Each line needs id matching crew.js:
+// tolba, jomana, maryam, zaky, tarek, abdelrahman, mohamed, carol, omar, seif, youssef_emad, moaz, hemaly, robot
+// Convos with only one speaker in the room still play that line (pruned). Add more blocks at end or use GAME.EXTRA_CHILL_CONVOS in game.js.
 C.CHILL_CONVOS = [
   // ── "Say my name" — Abdelrahman ──────────────────────────────────────
   [
@@ -312,6 +384,61 @@ C.CHILL_CONVOS = [
     { id:'robot',        text:'[INFO] Jomana alert radius: the entire ship.',             delay:2000 },
     { id:'tarek',        text:'the robot confirmed it. she knows.',                        delay:1800 },
   ],
+  // ── Carol + comms (mess / overlap) ─────────────────────────────────────
+  [
+    { id:'carol',       text:'comms check: Gerald Jr. is still a ghost in the logs',        delay:0    },
+    { id:'robot',       text:'[COMMS] Gerald Jr. has been classified. Level: spooky.',    delay:2200 },
+    { id:'carol',       text:'of course he has',                                          delay:2000 },
+  ],
+  [
+    { id:'tarek',       text:'carol can you hear me or am i shouting into the void',       delay:0    },
+    { id:'carol',       text:'void confirmed. also i hear you. keep it down.',             delay:2300 },
+    { id:'robot',       text:'[NOTE] Volume acceptable. Drama: elevated.',                 delay:2000 },
+  ],
+  // ── Maryam + paperwork energy ──────────────────────────────────────────
+  [
+    { id:'maryam',      text:'if anyone needs signatures i brought the scary clipboard', delay:0    },
+    { id:'tarek',       text:'scary clipboard is not a mood maryam',                       delay:2200 },
+    { id:'maryam',      text:'it is a lifestyle',                                           delay:2000 },
+  ],
+  [
+    { id:'omar',        text:'maryam already filed my apology in triplicate',              delay:0    },
+    { id:'maryam',      text:'you apologized in advance. i respect the efficiency.',     delay:2400 },
+    { id:'robot',       text:'[LOG] Apology index: omar/7. Trending upward.',              delay:2000 },
+  ],
+  // ── Jomana presence (crew reacts — she is rarely in the mess on ☕) ───
+  [
+    { id:'seif',        text:'if jomana walks in we scatter like its a fire drill',        delay:0    },
+    { id:'mohamed',     text:'statistically she is always one corridor away',              delay:2200 },
+    { id:'robot',       text:'[DATA] Jomana ETA: statistically yes.',                      delay:2000 },
+  ],
+  [
+    { id:'carol',       text:'jomana asked for a comms summary. i said "mostly nominal"',   delay:0    },
+    { id:'jomana',      text:'mostly is not a word i enjoy on my bridge.',                 delay:2400 },
+    { id:'carol',       text:'copy. switching to "nominal with receipts."',                delay:2000 },
+  ],
+  // ── Zaky + patron suite leaks into gossip ─────────────────────────────
+  [
+    { id:'zaky',        text:'the plant in my suite has opinions about your demo schedule', delay:0   },
+    { id:'tarek',       text:'the plant is not on the sprint board zaky',                   delay:2300 },
+    { id:'robot',       text:'[BOTANY] Plant sentiment: skeptical.',                        delay:2000 },
+  ],
+  [
+    { id:'mohamed',     text:'zaky said "patron priorities" and now i fear the spreadsheet', delay:0  },
+    { id:'zaky',        text:'fear is a valid KPI',                                         delay:2200 },
+    { id:'robot',       text:'[METRICS] KPI: fear trending up. Action: coffee.',            delay:2000 },
+  ],
+  // ── Tolba gravity field ───────────────────────────────────────────────
+  [
+    { id:'tarek',       text:'tolba said adequate and i felt it in my spine',               delay:0    },
+    { id:'abdelrahman', text:'that is the tolba gravity field',                             delay:2200 },
+    { id:'robot',       text:'[PHYSICS] Adequate emits measurable spine torque.',           delay:2000 },
+  ],
+  [
+    { id:'tolba',       text:'brief update: adequate is not an insult. it is a standard.',  delay:0    },
+    { id:'maryam',      text:'logging that as official doctrine',                           delay:2400 },
+    { id:'robot',       text:'[ARCHIVE] Doctrine stored. Morale: complicated.',             delay:2000 },
+  ],
 ];
 
 // Moaz + Hemaly specific convos (trigger when both are together)
@@ -346,26 +473,39 @@ C.MOAZ_HEMALY_CONVOS = [
   ],
 ];
 
-C.getAllChillScriptLines = (function(){
-  var cache = null;
-  return function(){
-    if(cache) return cache;
-    cache = [];
-    C.CHILL_CONVOS.forEach(function(convo){
+C.getAllChillScriptLines = function(){
+  if(_allChillLinesCache) return _allChillLinesCache;
+  _allChillLinesCache = [];
+  C.CHILL_CONVOS.forEach(function(convo){
+    convo.forEach(function(line){
+      if(line && line.text) _allChillLinesCache.push(line.text);
+    });
+  });
+  if(C.MOAZ_HEMALY_CONVOS){
+    C.MOAZ_HEMALY_CONVOS.forEach(function(convo){
       convo.forEach(function(line){
-        if(line && line.text) cache.push(line.text);
+        if(line && line.text) _allChillLinesCache.push(line.text);
       });
     });
-    if(C.MOAZ_HEMALY_CONVOS){
-      C.MOAZ_HEMALY_CONVOS.forEach(function(convo){
-        convo.forEach(function(line){
-          if(line && line.text) cache.push(line.text);
-        });
+  }
+  if(GAME.crew){
+    GAME.crew.forEach(function(c){
+      if(!c.lines || !c.lines.chatter) return;
+      c.lines.chatter.forEach(function(t){ if(t) _allChillLinesCache.push(t); });
+    });
+  }
+  if(GAME.scriptedScenesExport){
+    GAME.scriptedScenesExport.forEach(function(s){ if(s && s.text) _allChillLinesCache.push(s.text); });
+  }
+  if(GAME.roomChatExport){
+    Object.keys(GAME.roomChatExport).forEach(function(rid){
+      (GAME.roomChatExport[rid] || []).forEach(function(row){
+        row.forEach(function(t){ if(t) _allChillLinesCache.push(t); });
       });
-    }
-    return cache;
-  };
-})();
+    });
+  }
+  return _allChillLinesCache;
+};
 
 C.triggerChillConvo = function(occupants){
   if(chillConvoActive) return;
@@ -377,13 +517,13 @@ C.triggerChillConvo = function(occupants){
   // Work-style Moaz/Hemaly convos off during ☕ chill — keep banter-only
   if(!GAME.ai.chillTimeActive &&
      occupants.some(function(c){ return c.id==='moaz'; }) &&
-     occupants.some(function(c){ return c.id==='hemaly'; }) && Math.random() < 0.55){
+     occupants.some(function(c){ return c.id==='hemaly'; }) && Math.random() < 0.28){
     queueConvo(pickNextMoazConvoBlock());
     return;
   }
 
   var prunedMess = pickMessPrunedForOcc(occIds);
-  if(prunedMess && prunedMess.length >= 2){
+  if(prunedMess && prunedMess.length >= 1){
     queueConvo(prunedMess);
     return;
   }
@@ -421,23 +561,28 @@ var GENERIC_MESS_CHILL_LINES = [
   'after this cup',
 ];
 
-C.getChillScriptLinesBySpeaker = (function(){
-  var cache = null;
-  return function(){
-    if(cache) return cache;
-    cache = {};
-    function add(line){
-      if(!line || !line.id || !line.text) return;
-      if(!cache[line.id]) cache[line.id] = [];
-      cache[line.id].push(line.text);
-    }
-    C.CHILL_CONVOS.forEach(function(convo){ convo.forEach(add); });
-    if(C.MOAZ_HEMALY_CONVOS){
-      C.MOAZ_HEMALY_CONVOS.forEach(function(convo){ convo.forEach(add); });
-    }
-    return cache;
-  };
-})();
+C.getChillScriptLinesBySpeaker = function(){
+  if(_chillBySpeakerCache) return _chillBySpeakerCache;
+  _chillBySpeakerCache = {};
+  function add(line){
+    if(!line || !line.id || !line.text) return;
+    if(!_chillBySpeakerCache[line.id]) _chillBySpeakerCache[line.id] = [];
+    _chillBySpeakerCache[line.id].push(line.text);
+  }
+  C.CHILL_CONVOS.forEach(function(convo){ convo.forEach(add); });
+  if(C.MOAZ_HEMALY_CONVOS){
+    C.MOAZ_HEMALY_CONVOS.forEach(function(convo){ convo.forEach(add); });
+  }
+  if(GAME.crew){
+    GAME.crew.forEach(function(c){
+      if(!c.lines || !c.lines.chatter) return;
+      c.lines.chatter.forEach(function(t){
+        if(t) add({ id: c.id, text: t });
+      });
+    });
+  }
+  return _chillBySpeakerCache;
+};
 
 C.pickRandomChillLineFor = function(crewId){
   var map = C.getChillScriptLinesBySpeaker();

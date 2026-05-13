@@ -21,6 +21,10 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;');
 }
 
+// Max DOM nodes per feed (0 = unlimited). Crew comms keeps full history for long sessions.
+H.COMMS_FEED_MAX = 0;
+H.MISSION_LOG_MAX = 0;
+
 H.init = function(){
   H._feed = [];
   H._toastQueue = [];
@@ -80,7 +84,7 @@ H.addLog = function(src, text, cls=''){
   div.className = `log-entry ${cls}`;
   div.innerHTML = `<span class="log-time">[${ts}]</span> <strong>${src}:</strong> ${text}`;
   el.appendChild(div);
-  if(el.children.length > 80) el.removeChild(el.children[0]);
+  if(H.MISSION_LOG_MAX > 0 && el.children.length > H.MISSION_LOG_MAX) el.removeChild(el.children[0]);
   if(stick) el.scrollTop = el.scrollHeight;
 };
 
@@ -99,9 +103,9 @@ H.addChatEntry = function(crewId, text){
 
   const div = document.createElement('div');
   div.className = 'chat-entry';
-  div.innerHTML = `<span class="chat-name ${cls}">${name}</span> <span class="chat-msg">${text}</span> <span class="chat-time">${ts}</span>`;
+  div.innerHTML = `<span class="chat-name ${cls}">${escapeHtml(name)}</span> <span class="chat-msg">${escapeHtml(text)}</span> <span class="chat-time">${ts}</span>`;
   el.appendChild(div);
-  if(el.children.length > 50) el.removeChild(el.children[0]);
+  if(H.COMMS_FEED_MAX > 0 && el.children.length > H.COMMS_FEED_MAX) el.removeChild(el.children[0]);
   if(atBottom) el.scrollTop = el.scrollHeight;
 };
 

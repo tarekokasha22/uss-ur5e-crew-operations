@@ -55,6 +55,13 @@ G.state = {
   selectedChar: null,
 };
 
+/**
+ * Optional: extra mess-hall chill script blocks (same shape as entries in js/chatter.js C.CHILL_CONVOS).
+ * Each item is an array of { id, text, delay } — id must match js/crew.js (e.g. tarek, omar, zaky, robot).
+ * Merged once on first GAME.chatter.init(); use this if you prefer not to edit chatter.js.
+ */
+GAME.EXTRA_CHILL_CONVOS = GAME.EXTRA_CHILL_CONVOS || [];
+
 var canvas, ctx;
 
 // ─── BOOT ─────────────────────────────────────────────────────────────
@@ -137,8 +144,8 @@ function startGame(){
   GAME.audio.enabled = GAME.save.get('audioEnabled') !== false;
 
   GAME.hud.init();
-  GAME.chatter.init();
   GAME.ai.init();
+  GAME.chatter.init();
   GAME.ai.initPositions();
 
   var ticker = document.getElementById('ticker-track');

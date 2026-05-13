@@ -72,6 +72,17 @@ const SCRIPTED_SCENES = [
   { from:'omar',    to:'seif',    text:'Define "under control".',                          time:21 },
   { from:'zaky',    to:'tolba',   text:'Project metrics looking excellent, Dr. Tolba.',    time:25 },
   { from:'tolba',   to:'zaky',    text:'They are adequate.',                               time:26 },
+  { from:'jomana',  to:'carol',   text:'Comms discipline on deck 4. Verify.',            time: 9 },
+  { from:'carol',   to:'jomana',  text:'Already verified. Logs attached.',                time:10 },
+  { from:'maryam',  to:'tolba',   text:'Captain — weekly digest is on your tablet.',     time:11 },
+  { from:'tolba',   to:'maryam',  text:'Adequate formatting.',                            time:12 },
+  { from:'jomana',  to:'tarek',   text:'Voice node uptime report. Now.',                   time:14 },
+  { from:'carol',   to:'robot',   text:'UR5e-01 — ping all arrays. Standard check.',      time:16 },
+  { from:'robot',   to:'carol',   text:'[COMMS] Arrays nominal. Logging as: green.',      time:17 },
+  { from:'zaky',    to:'maryam',  text:'Patron suite requests are… enthusiastic.',       time:19 },
+  { from:'maryam',  to:'zaky',    text:'I will translate "enthusiastic" into paperwork.', time:22 },
+  { from:'jomana',  to:'moaz',    text:'TA lab power budget. Explain.',                    time:23 },
+  { from:'moaz',    to:'jomana',  text:'Science requires… overhead.',                      time:24 },
 ];
 
 const ROOM_CHAT = {
@@ -168,7 +179,16 @@ function rebuildHumanChillBubbleDeck(){
   CHILL_LOBBY_SNAPS.forEach(function(row){ row.forEach(function(s){ _humanChillBubbleDeck.push(s); }); });
   CHILL_ROBOT_HUMAN.forEach(function(pair){ if(pair[0]) _humanChillBubbleDeck.push(pair[0]); });
   (TRANSIT_MSGS.medbay_mess || []).forEach(function(s){ _humanChillBubbleDeck.push(s); });
-  (ROOM_CHAT.medbay_mess || []).forEach(function(row){ row.forEach(function(s){ _humanChillBubbleDeck.push(s); }); });
+  Object.keys(ROOM_CHAT).forEach(function(rid){
+    (ROOM_CHAT[rid] || []).forEach(function(row){ row.forEach(function(s){ _humanChillBubbleDeck.push(s); }); });
+  });
+  if(GAME.crew){
+    GAME.crew.forEach(function(c){
+      if(c.kind === 'robot' || !c.lines || !c.lines.chatter) return;
+      c.lines.chatter.forEach(function(t){ if(t) _humanChillBubbleDeck.push(t); });
+    });
+  }
+  SCRIPTED_SCENES.forEach(function(s){ if(s && s.text) _humanChillBubbleDeck.push(s.text); });
   _humanChillBubbleDeck.push('wrong break group','not on the guest list','invited-only mess hall','the vibes are loud here');
   shuffleInPlaceAi(_humanChillBubbleDeck);
   _humanChillBubblePtr = 0;
@@ -677,7 +697,7 @@ function checkChillRoom(){
 
   // Trigger chill room convo — more frequent during chill time
   if(chillOccupants.length >= 2 && !jomanaInChill){
-    var chance = AI.chillTimeActive ? 0.78 : 0.20;
+    var chance = AI.chillTimeActive ? 0.92 : 0.22;
     if(Math.random() < chance){
       GAME.chatter.triggerChillConvo(chillOccupants);
     }
@@ -1012,6 +1032,15 @@ GAME.chillTime = function(){
     if(eligible.length >= 2 && nPick < 2) nPick = 2;
     if(eligible.length < 2) nPick = eligible.length;
     var picks = eligible.slice(0, Math.max(1, nPick));
+    function notPicked(id){ return !picks.some(function(p){ return p.id === id; }); }
+    function tryAddBonus(id){
+      if(picks.length >= 5) return;
+      var c = GAME.crew.find(function(x){ return x.id === id && notPicked(id); });
+      if(c) picks.push(c);
+    }
+    if(Math.random() < 0.55) tryAddBonus('carol');
+    if(Math.random() < 0.22) tryAddBonus('zaky');
+    if(Math.random() < 0.12) tryAddBonus('maryam');
     if(!picks.length){
       GAME.hud.showToast('No eligible crew for mess break (command staff stay on duty).', 'info', 'SYS');
       return;
@@ -1042,5 +1071,8 @@ GAME.chillTime = function(){
     GAME.hud.showToast('Break: ' + picks.length + ' crew + robot in mess. Everyone else stays on station. Click ☕ to end.', 'success', 'SYS');
   }
 };
+
+GAME.roomChatExport = ROOM_CHAT;
+GAME.scriptedScenesExport = SCRIPTED_SCENES;
 
 })();
