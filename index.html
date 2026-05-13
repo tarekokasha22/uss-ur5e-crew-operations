@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USS UR5e — Crew Operations</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════════════════ BOOT SCREEN ════════════════════ -->
+<div id="boot-screen">
+  <div id="boot-logo">USS UR5e — CREW OPERATIONS</div>
+  <pre id="boot-text"></pre>
+  <div id="boot-progress-bar"><div id="boot-progress-fill"></div></div>
+</div>
+
+<!-- ═══════════════════ GAME WRAPPER ════════════════════ -->
+<div id="game-wrapper" class="hidden">
+
+  <!-- TOP HUD -->
+  <div id="hud-top">
+    <div class="hud-ship-name">⚓ USS UR5e</div>
+
+    <div class="hud-stat">
+      <span class="hud-stat-label">MISSION DAY</span>
+      <span class="hud-stat-value" id="hud-day">DAY 001</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-stat-label">SHIP TIME</span>
+      <span class="hud-stat-value cyan" id="hud-uptime">00:00</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-stat-label">CREW</span>
+      <span class="hud-stat-value green" id="hud-crew">14/14</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-stat-label">CYCLE</span>
+      <span class="hud-stat-value green" id="hud-mode">☀ DAY</span>
+    </div>
+    <div class="hud-stat">
+      <span class="hud-stat-label">ROBOT</span>
+      <span class="hud-stat-value cyan">◉ ACTIVE</span>
+    </div>
+
+    <div class="hud-spacer"></div>
+
+    <div id="alert-banner">⚠ SYSTEM ALERT</div>
+
+    <button class="hud-btn" onclick="GAME.openSettings()">⚙ SETTINGS</button>
+    <a href="dossiers.html" class="hud-btn" style="text-decoration:none">📋 DOSSIERS</a>
+    <button class="hud-btn" onclick="GAME.hud.addLog('HELP','Hover crew = tooltip. Click crew = dossier. Robot patrols 24/7. Try Konami code: ↑↑↓↓←→←→BA','log-success')">? HELP</button>
+  </div>
+
+  <!-- LEFT PANEL: Mission Log -->
+  <div id="panel-left">
+    <div class="panel-header">◈ MISSION LOG</div>
+    <div id="mission-log"></div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-wrap">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- RIGHT PANEL: Crew Comms -->
+  <div id="panel-right">
+    <div class="panel-header">◈ CREW COMMS</div>
+    <div id="comms-feed"></div>
+  </div>
+
+  <!-- BOTTOM TICKER -->
+  <div id="ticker-wrap">
+    <div class="ticker-label">SHIP STATUS</div>
+    <div id="ticker-track">Loading...</div>
+  </div>
+
+  <!-- BOTTOM BUTTONS -->
+  <div id="bottom-bar">
+    <a href="dossiers.html" class="bottom-btn">📋 DOSSIERS</a>
+    <button id="move-mode-btn" class="bottom-btn" onclick="GAME.toggleMoveMode()" title="Toggle move mode (M key) — select crew, click room to move them">🚀 MOVE CREW</button>
+    <button class="bottom-btn" onclick="GAME.callRobot()" title="Send robot to deliver coffee to Dr. Tolba with Tarek's message">🤖 CALL ROBOT</button>
+    <button class="bottom-btn" onclick="GAME.allHandsOnDeck()" title="Everyone returns to their home station immediately">📣 ALL HANDS</button>
+    <button id="chill-btn" class="bottom-btn" onclick="GAME.chillTime()" title="Mess: 2–3 invited + robot. Moaz & Hemaly stay in TA lab. Chill caps: voice booth max 3 humans; other rooms max 3 (TA lab 2). Click again to end.">☕ CHILL TIME</button>
+    <button class="bottom-btn" onclick="GAME.hud.showToast('[SYS] All systems nominal. Robot operational. Crew accounted for.','info','SYS')">⚡ STATUS</button>
+    <button class="bottom-btn" onclick="GAME.hud.triggerKonami()">🎮 ?????</button>
+    <button class="bottom-btn" onclick="GAME.openSettings()">⚙ SETTINGS</button>
+    <button class="bottom-btn danger" onclick="if(confirm('Reset all save data?')){GAME.save.reset();location.reload();}">⚠ RESET</button>
+  </div>
+
+</div><!-- /game-wrapper -->
+
+<!-- ═══════════════════ NIGHT OVERLAY ════════════════════ -->
+<div id="night-overlay"></div>
+
+<!-- ═══════════════════ TOOLTIP ════════════════════════════ -->
+<div id="tooltip">
+  <div class="tt-name">—</div>
+  <div class="tt-role">—</div>
+  <div class="tt-line">—</div>
+</div>
+
+<!-- ═══════════════════ TOAST CONTAINER ═══════════════════ -->
+<div id="toast-container"></div>
+
+<!-- ═══════════════════ ACHIEVEMENT POPUP ═════════════════ -->
+<div id="achievement-popup">
+  <div class="ach-title">ACHIEVEMENT UNLOCKED</div>
+  <div class="ach-sub">—</div>
+</div>
+
+<!-- ═══════════════════ DOSSIER MODAL ═════════════════════ -->
+<div id="modal-overlay">
+  <div id="dossier-modal">
+    <!-- populated by JS -->
+  </div>
+</div>
+
+<!-- ═══════════════════ SETTINGS MODAL ════════════════════ -->
+<div id="settings-modal">
+  <div class="settings-box">
+    <h2>⚙ SHIP SETTINGS</h2>
+    <div class="settings-row">
+      <span>Audio SFX</span>
+      <button id="audio-toggle" class="toggle-btn on" onclick="GAME.toggleAudio()">ON</button>
+    </div>
+    <div class="settings-row">
+      <span>Crew Dossier Wall</span>
+      <a href="dossiers.html" target="_blank" class="toggle-btn on" style="text-decoration:none">OPEN →</a>
+    </div>
+    <div class="settings-row">
+      <span>Konami Code</span>
+      <span style="font-size:0.75rem;color:#00ff88">↑↑↓↓←→←→BA</span>
+    </div>
+    <div class="settings-row">
+      <span>Ship Version</span>
+      <span style="font-size:0.75rem;color:#00ff88">v1.0.0-HUMBLE</span>
+    </div>
+    <div class="settings-row">
+      <span>Robot Build</span>
+      <span style="font-size:0.75rem;color:#00d4ff">UR5e + MoveIt2</span>
+    </div>
+    <div style="margin-top:16px">
+      <button class="bottom-btn" onclick="GAME.closeSettings()">✕ CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SCRIPTS ═══════════════════════════ -->
+<script src="js/crew.js"></script>
+<script src="js/rooms.js"></script>
+<script src="js/pixel.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/chatter.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/game.js"></script>
+
+</body>
+</html>

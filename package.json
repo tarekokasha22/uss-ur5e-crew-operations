@@ -1,0 +1,21 @@
+{
+  "name": "uss-ur5e-crew-operations",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-based USS UR5e ship operations sim — GIU Robotics Lab IR project: crew AI, mess-hall chill scripts, dossiers, day/night loop, vanilla JS + Canvas.",
+  "license": "MIT",
+  "scripts": {
+    "start": "python3 -m http.server 8765",
+    "serve": "python3 -m http.server 8765"
+  },
+  "keywords": [
+    "html5",
+    "canvas",
+    "simulation",
+    "robotics",
+    "giu",
+    "information-retrieval",
+    "vanilla-javascript",
+    "game"
+  ]
+}

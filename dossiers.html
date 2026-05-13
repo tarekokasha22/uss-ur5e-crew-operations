@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USS UR5e — Crew Dossier Wall</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow-y: auto; overflow-x: hidden; }
+    #dossier-modal { animation: none; }
+  </style>
+</head>
+<body>
+
+<div class="dossier-wall-page">
+  <div class="dossier-wall-title">CREW DOSSIER WALL</div>
+  <div class="dossier-wall-sub">USS UR5e — CLASSIFIED PERSONNEL FILES — CLEARANCE REQUIRED</div>
+
+  <div class="dossier-grid" id="dossier-grid">
+    <!-- Cards injected by JS -->
+  </div>
+
+  <a href="index.html" class="back-btn">← BACK TO SHIP</a>
+</div>
+
+<!-- Full dossier modal (reused from main) -->
+<div id="modal-overlay">
+  <div id="dossier-modal"></div>
+</div>
+
+<div id="toast-container"></div>
+<div id="achievement-popup">
+  <div class="ach-title"></div>
+  <div class="ach-sub"></div>
+</div>
+
+<script src="js/crew.js"></script>
+<script src="js/rooms.js"></script>
+<script src="js/pixel.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/hud.js"></script>
+<script>
+(function(){
+  GAME.state = { isNight: (new Date().getHours()>=22||new Date().getHours()<6) };
+
+  // Minimal stubs so hud.js works standalone
+  GAME.chatter = { update: function(){} };
+  GAME.ai      = {};
+
+  function buildCard(char){
+    const card = document.createElement('div');
+    card.className = 'dossier-card';
+    card.onclick = function(){ openCard(char); };
+
+    const topDiv = document.createElement('div');
+    topDiv.className = 'dossier-card-top';
+
+    // Portrait canvas
+    const canvasEl = document.createElement('canvas');
+    canvasEl.className = 'card-portrait';
+    canvasEl.width = 64; canvasEl.height = 64;
+    topDiv.appendChild(canvasEl);
+
+    // Info
+    const info = document.createElement('div');
+    info.className = 'card-info';
+    info.innerHTML = `
+      <div class="card-codename">${char.codename}</div>
+      <div class="card-name">${char.displayName}</div>
+      <div class="card-role">${char.role}</div>
+      <div class="card-clearance">${char.clearance}</div>
+    `;
+    topDiv.appendChild(info);
+    card.appendChild(topDiv);
+
+    // Stamp
+    const stamp = document.createElement('div');
+    stamp.className = 'card-stamp';
+    stamp.textContent = char.kind === 'robot' ? 'MACHINE' : 'CLASSIFIED';
+    card.appendChild(stamp);
+
+    // Bio snippet
+    const bio = document.createElement('div');
+    bio.className = 'card-bio';
+    bio.textContent = char.dossier.bio.slice(0, 120) + '...';
+    card.appendChild(bio);
+
+    // Draw portrait after append
+    requestAnimationFrame(() => {
+      const portCtx = canvasEl.getContext('2d');
+      GAME.pixel.drawPortrait(portCtx, char, 64);
+    });
+
+    return card;
+  }
+
+  function openCard(char){
+    GAME.audio.play('dossier_stamp');
+    GAME.save.markCrewClicked(char.id);
+    GAME.hud.triggerAchievement('first_contact');
+    if(GAME.save.getClickedCrewCount() >= GAME.crew.length)
+      GAME.hud.triggerAchievement('roll_call');
+    if(GAME.state.isNight)
+      GAME.hud.triggerAchievement('insomniac');
+
+    char.state = 'dossier_mode';
+    GAME.hud.openDossier(char.id);
+
+    // Re-render portrait inside modal after it opens
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const c = document.getElementById('dossier-portrait-canvas');
+        if(c){ GAME.pixel.drawPortrait(c.getContext('2d'), char, 100); }
+      });
+    });
+  }
+
+  // Close modal
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if(e.target.id === 'modal-overlay') GAME.hud.closeDossier();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape') GAME.hud.closeDossier();
+  });
+
+  // Override closeDossier to not break this page
+  GAME.hud._origClose = GAME.hud.closeDossier;
+  GAME.hud.closeDossier = function(){
+    const overlay = document.getElementById('modal-overlay');
+    if(overlay) overlay.classList.remove('visible');
+    GAME.crew.forEach(c => { if(c.state==='dossier_mode') c.state='idle'; });
+  };
+
+  GAME.save.load();
+  GAME.audio.enabled = GAME.save.get('audioEnabled') !== false;
+  GAME.hud.init();
+
+  // Build grid
+  const grid = document.getElementById('dossier-grid');
+  GAME.crew.forEach(char => {
+    grid.appendChild(buildCard(char));
+  });
+})();
+</script>
+</body>
+</html>
