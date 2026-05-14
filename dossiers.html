@@ -20,7 +20,7 @@
     <!-- Cards injected by JS -->
   </div>
 
-  <a href="index.html" class="back-btn">← BACK TO SHIP</a>
+  <a href="index.html" class="back-btn" id="back-to-ship">← BACK TO SHIP</a>
 </div>
 
 <!-- Full dossier modal (reused from main) -->
@@ -135,6 +135,13 @@
   GAME.save.load();
   GAME.audio.enabled = GAME.save.get('audioEnabled') !== false;
   GAME.hud.init();
+
+  var back = document.getElementById('back-to-ship');
+  if(back){
+    back.addEventListener('click', function(e){
+      try { sessionStorage.setItem('uss_resume_bridge', '1'); } catch(err){}
+    });
+  }
 
   // Build grid
   const grid = document.getElementById('dossier-grid');

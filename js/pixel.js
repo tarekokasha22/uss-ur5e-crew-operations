@@ -20,6 +20,54 @@ function rgba(hex,a){
   return `rgba(${r},${g},${b},${a})`;
 }
 
+/** Room designation strip: icon + name + subtitle (fixed order from rooms.js, not random). */
+function drawRoomDesignationPlaque(ctx, room, rx, plaqueY, rw, plaqueH, c){
+  if(!room || !room.name || plaqueH < 10) return;
+  const px = rx + 8;
+  const pw = rw - 16;
+  ctx.save();
+  ctx.beginPath();
+  if(typeof ctx.roundRect === 'function'){
+    ctx.roundRect(px, plaqueY, pw, plaqueH, 4);
+  } else {
+    ctx.rect(px, plaqueY, pw, plaqueH);
+  }
+  const bg = ctx.createLinearGradient(px, plaqueY, px + pw, plaqueY + plaqueH);
+  bg.addColorStop(0, 'rgba(4,8,16,0.94)');
+  bg.addColorStop(0.5, rgba(c.bg, 0.88));
+  bg.addColorStop(1, 'rgba(2,4,10,0.94)');
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.strokeStyle = rgba(c.border, 0.75);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.strokeStyle = rgba(c.accent, 0.35);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 2, plaqueY + 2, pw - 4, plaqueH - 4);
+
+  const icon = room.icon || '◆';
+  const title = String(room.name);
+  const sub = room.subtitle ? String(room.subtitle) : '';
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = '13px monospace';
+  ctx.fillStyle = rgba(c.glow, 0.95);
+  ctx.fillText(icon, px + 8, plaqueY + plaqueH * 0.38);
+
+  ctx.font = 'bold 11px "Share Tech Mono", monospace';
+  ctx.fillStyle = lighten(c.accent, 1.15);
+  const titleX = px + 30;
+  ctx.fillText(title, titleX, plaqueY + plaqueH * 0.36);
+
+  if(sub){
+    ctx.font = '9px "Share Tech Mono", monospace';
+    ctx.fillStyle = rgba(c.border, 0.92);
+    ctx.fillText(sub, titleX, plaqueY + plaqueH * 0.78);
+  }
+  ctx.restore();
+}
+
 // Deep space + stars for room “viewport” wall band (always visible behind tint)
 function drawWallSpaceBackdrop(ctx, rx, ry, rw, wallH, roomId, tick){
   const seed = (roomId || 'x').split('').reduce(function(a, ch){ return a + ch.charCodeAt(0); }, 0);
@@ -58,9 +106,9 @@ function drawWallSpaceBackdrop(ctx, rx, ry, rw, wallH, roomId, tick){
   }
 }
 
-// ─── DRAW CHARACTER ─────────────────────────────────────────────────
-// scale=5 → character is ~30×50 canvas pixels (visible, detailed)
-P.drawCharacter = function(ctx, char, worldX, worldY, frame, scale=5){
+// ─── DRAW CHARACTER (redesigned — more detail, better proportions) ────
+// scale=6 → character ~36×84px; 4-frame walk animation
+P.drawCharacter = function(ctx, char, worldX, worldY, frame, scale=6){
   const p = char.portrait;
   const s = scale;
   const x = Math.floor(worldX);
@@ -68,175 +116,273 @@ P.drawCharacter = function(ctx, char, worldX, worldY, frame, scale=5){
 
   ctx.save();
 
-  // Ground shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.fillRect(x, y+10*s, 6*s, Math.ceil(s*0.5));
+  // Ground shadow (elliptical)
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.beginPath();
+  ctx.ellipse(x+3*s, y+13*s, 3*s, Math.ceil(s*0.38), 0, 0, Math.PI*2);
+  ctx.fill();
 
-  // ── Legs (alternating walk anim) ──────────────────────────────────
-  const legOff = (frame%2===0) ? 0 : s;
+  // ── 4-frame walk cycle ────────────────────────────────────────────
+  const wf = frame % 4;
+  const legLOff = [0, s, s, 0][wf];
+  const legROff = [s, 0, 0, s][wf];
+  const armLOff = [s, Math.ceil(s/2), 0, Math.ceil(s/2)][wf];
+  const armROff = [0, Math.ceil(s/2), s, Math.ceil(s/2)][wf];
+
+  // ── Shoes ──────────────────────────────────────────────────────────
+  const shoeCol = darken(p.pants || '#222', 0.50);
+  ctx.fillStyle = shoeCol;
+  ctx.fillRect(x+s,       y+12*s+legLOff, s+2, Math.ceil(s*1.1));
+  ctx.fillRect(x+3*s+1,   y+12*s+legROff, s+2, Math.ceil(s*1.1));
+  ctx.fillStyle = lighten(shoeCol, 1.3);
+  ctx.fillRect(x+s,       y+12*s+legLOff, s+2, 1);
+  ctx.fillRect(x+3*s+1,   y+12*s+legROff, s+2, 1);
+
+  // ── Legs ───────────────────────────────────────────────────────────
   ctx.fillStyle = p.pants || '#222';
-  ctx.fillRect(x+s,   y+6*s, s+1, 3*s + legOff);
-  ctx.fillRect(x+3*s, y+6*s, s+1, 3*s + (s - legOff));
+  ctx.fillRect(x+s,     y+9*s, s+1, 3*s + legLOff);
+  ctx.fillRect(x+3*s+1, y+9*s, s+1, 3*s + legROff);
+  ctx.fillStyle = lighten(p.pants || '#222', 1.12);
+  ctx.fillRect(x+s,     y+9*s, 1, 3*s);
+  ctx.fillRect(x+3*s+1, y+9*s, 1, 3*s);
+  ctx.fillStyle = darken(p.pants || '#222', 0.72);
+  ctx.fillRect(x+s+s,   y+9*s, 1, 3*s);
+  ctx.fillRect(x+3*s+2, y+9*s, 1, 3*s);
 
-  // Shoes
-  ctx.fillStyle = darken(p.pants || '#222', 0.55);
-  ctx.fillRect(x+s,   y+9*s + legOff, s+1, s);
-  ctx.fillRect(x+3*s, y+9*s + (s-legOff), s+1, s);
+  // ── Belt ───────────────────────────────────────────────────────────
+  ctx.fillStyle = darken(p.pants || '#222', 0.58);
+  ctx.fillRect(x+s, y+8*s+Math.ceil(s*0.65), 4*s, Math.ceil(s*0.45));
+  ctx.fillStyle = '#888';
+  ctx.fillRect(x+2*s+Math.ceil(s*0.2), y+8*s+Math.ceil(s*0.65), Math.ceil(s*0.9), Math.ceil(s*0.45));
 
-  // ── Body / shirt ──────────────────────────────────────────────────
+  // ── Body / shirt ───────────────────────────────────────────────────
   ctx.fillStyle = p.shirt || '#333';
-  ctx.fillRect(x+s, y+3*s, 4*s, 3*s);
-  // Shirt shading (darker bottom strip)
-  ctx.fillStyle = darken(p.shirt || '#333', 0.7);
-  ctx.fillRect(x+s, y+5*s, 4*s, s);
-  ctx.fillStyle = 'rgba(0,0,0,0.42)';
-  ctx.fillRect(x+s, y+5*s+Math.floor(s*0.55), 4*s, Math.max(1, Math.ceil(s*0.22)));
-
+  ctx.fillRect(x+s, y+4*s, 4*s, 5*s);
+  // Highlight left
+  ctx.fillStyle = lighten(p.shirt || '#333', 1.18);
+  ctx.fillRect(x+s, y+4*s, 1, 4*s);
+  ctx.fillRect(x+s, y+4*s, 4*s, 1);
+  // Shadow right
+  ctx.fillStyle = darken(p.shirt || '#333', 0.72);
+  ctx.fillRect(x+4*s, y+4*s, s, 5*s);
+  ctx.fillRect(x+s, y+8*s, 3*s, s);
   // Collar
   ctx.fillStyle = p.skin;
-  ctx.fillRect(x+2*s, y+3*s, 2*s, s);
+  ctx.fillRect(x+2*s, y+4*s, 2*s, Math.ceil(s*0.55));
+  // Button line
+  ctx.fillStyle = darken(p.shirt || '#333', 0.68);
+  ctx.fillRect(x+2*s+Math.ceil(s*0.4), y+5*s, 1, 3*s);
 
-  // ── Arms ──────────────────────────────────────────────────────────
-  const armSwing = frame%4 < 2 ? -Math.ceil(s/2) : Math.ceil(s/2);
-  ctx.fillStyle = p.shirt;
-  ctx.fillRect(x,       y+3*s + armSwing,  s, 2*s);
-  ctx.fillRect(x+5*s,   y+3*s - armSwing,  s, 2*s);
-  // Hands
+  // ── Arms ───────────────────────────────────────────────────────────
+  // Left arm
+  ctx.fillStyle = p.shirt || '#333';
+  ctx.fillRect(x, y+4*s+armLOff, s, Math.ceil(s*2.4));
+  ctx.fillStyle = lighten(p.shirt || '#333', 1.15);
+  ctx.fillRect(x, y+4*s+armLOff, 1, Math.ceil(s*2.4));
+  // Left hand
   ctx.fillStyle = p.skin;
-  ctx.fillRect(x,       y+5*s + armSwing,  s, s);
-  ctx.fillRect(x+5*s,   y+5*s - armSwing,  s, s);
-
-  // ── Neck ──────────────────────────────────────────────────────────
+  ctx.fillRect(x, y+4*s+armLOff+Math.ceil(s*2.4), s, Math.ceil(s*0.8));
+  // Right arm
+  ctx.fillStyle = p.shirt || '#333';
+  ctx.fillRect(x+5*s, y+4*s+armROff, s, Math.ceil(s*2.4));
+  ctx.fillStyle = darken(p.shirt || '#333', 0.78);
+  ctx.fillRect(x+5*s+Math.ceil(s*0.6), y+4*s+armROff, Math.ceil(s*0.4), Math.ceil(s*2.4));
+  // Right hand
   ctx.fillStyle = p.skin;
-  ctx.fillRect(x+2*s, y+2*s, 2*s, s+1);
+  ctx.fillRect(x+5*s, y+4*s+armROff+Math.ceil(s*2.4), s, Math.ceil(s*0.8));
 
-  // ── Head ──────────────────────────────────────────────────────────
+  // ── Neck ───────────────────────────────────────────────────────────
+  ctx.fillStyle = p.skin;
+  ctx.fillRect(x+2*s, y+3*s, 2*s, s+1);
+  ctx.fillStyle = darken(p.skin, 0.82);
+  ctx.fillRect(x+3*s, y+3*s, s, s);
+
+  // ── Head ───────────────────────────────────────────────────────────
   ctx.fillStyle = p.skin;
   ctx.fillRect(x+s, y, 4*s, 3*s);
-  // Head shading (right side)
-  ctx.fillStyle = darken(p.skin, 0.85);
+  // Highlight top-left
+  ctx.fillStyle = lighten(p.skin, 1.10);
+  ctx.fillRect(x+s, y, 2*s, 1);
+  ctx.fillRect(x+s, y, 1, 2*s);
+  // Shadow right
+  ctx.fillStyle = darken(p.skin, 0.84);
   ctx.fillRect(x+4*s, y, s, 3*s);
+  ctx.fillRect(x+s, y+2*s, 1, s);
 
-  // ── Hair ──────────────────────────────────────────────────────────
+  // ── Hair ───────────────────────────────────────────────────────────
   if(p.hair && !p.features.includes('bald')){
     ctx.fillStyle = p.hair;
     if(p.features.includes('long_hair')){
-      ctx.fillRect(x+s, y, 4*s, s);          // top
-      ctx.fillRect(x,   y+s, s, 2*s);        // left side
-      ctx.fillRect(x+5*s, y+s, s, 2*s);      // right side
-      ctx.fillRect(x, y+3*s, s, s);          // shoulder drape L
+      ctx.fillRect(x+s, y, 4*s, Math.ceil(s*1.2));
+      ctx.fillRect(x, y+Math.ceil(s*0.4), s, 2*s+1);
+      ctx.fillRect(x+5*s, y+Math.ceil(s*0.4), s, 2*s+1);
+      ctx.fillRect(x, y+2*s, s, 2*s);
+      // Hair highlight
+      ctx.fillStyle = lighten(p.hair, 1.22);
+      ctx.fillRect(x+2*s, y, s, 1);
     } else if(p.features.includes('hoodie')){
-      ctx.fillRect(x+s, y, 4*s, s);
-      ctx.fillStyle = p.shirt;               // hoodie sides
-      ctx.fillRect(x, y+s, s, s);
-      ctx.fillRect(x+5*s, y+s, s, s);
+      ctx.fillRect(x+s, y, 4*s, Math.ceil(s*1.2));
+      ctx.fillStyle = p.shirt;
+      ctx.fillRect(x, y+Math.ceil(s*0.5), s, Math.ceil(s*1.2));
+      ctx.fillRect(x+5*s, y+Math.ceil(s*0.5), s, Math.ceil(s*1.2));
     } else {
-      ctx.fillRect(x+s, y, 4*s, s);         // basic hair top
+      ctx.fillRect(x+s, y, 4*s, Math.ceil(s*1.2));
+      ctx.fillRect(x+s, y, 1, Math.ceil(s*1.5));
+      ctx.fillStyle = lighten(p.hair, 1.25);
+      ctx.fillRect(x+2*s, y, s, 1);
     }
   } else if(p.features.includes('bald')){
-    ctx.fillStyle = lighten(p.skin, 1.15);
-    ctx.fillRect(x+2*s, y, 2*s, Math.ceil(s*0.6)); // bald shine
+    ctx.fillStyle = lighten(p.skin, 1.16);
+    ctx.fillRect(x+2*s, y, 2*s, Math.ceil(s*0.65));
+    ctx.fillRect(x+2*s, y, s, 1);
   }
 
-  // ── Eyes ──────────────────────────────────────────────────────────
+  // ── Eyebrows ───────────────────────────────────────────────────────
+  const browCol = p.hair ? darken(p.hair, 0.85) : darken(p.skin, 0.62);
+  if(!p.features.includes('bald')){
+    ctx.fillStyle = browCol;
+    ctx.fillRect(x+s+Math.ceil(s*0.3), y+Math.ceil(s*0.65), Math.ceil(s*1.0), Math.ceil(s*0.3));
+    ctx.fillRect(x+3*s+Math.ceil(s*0.0), y+Math.ceil(s*0.65), Math.ceil(s*1.0), Math.ceil(s*0.3));
+  }
+
+  // ── Eyes ───────────────────────────────────────────────────────────
   ctx.fillStyle = '#111';
-  ctx.fillRect(x+s+Math.ceil(s*0.4), y+s, s, s);
-  ctx.fillRect(x+3*s,                y+s, s, s);
-  // Eye whites / highlights
+  ctx.fillRect(x+s+Math.ceil(s*0.45), y+s, Math.ceil(s*0.85), Math.ceil(s*0.85));
+  ctx.fillRect(x+3*s+Math.ceil(s*0.05), y+s, Math.ceil(s*0.85), Math.ceil(s*0.85));
   ctx.fillStyle = '#fff';
-  ctx.fillRect(x+s+Math.ceil(s*0.4)+Math.ceil(s*0.6), y+s, Math.ceil(s*0.4), Math.ceil(s*0.4));
-  ctx.fillRect(x+3*s+Math.ceil(s*0.6), y+s, Math.ceil(s*0.4), Math.ceil(s*0.4));
+  ctx.fillRect(x+s+Math.ceil(s*0.45)+Math.ceil(s*0.5), y+s, Math.ceil(s*0.35), Math.ceil(s*0.35));
+  ctx.fillRect(x+3*s+Math.ceil(s*0.05)+Math.ceil(s*0.5), y+s, Math.ceil(s*0.35), Math.ceil(s*0.35));
 
-  // ── Mouth ─────────────────────────────────────────────────────────
-  ctx.fillStyle = darken(p.skin, 0.7);
-  ctx.fillRect(x+2*s, y+2*s+Math.ceil(s*0.5), 2*s, Math.ceil(s*0.3));
+  // ── Nose ───────────────────────────────────────────────────────────
+  ctx.fillStyle = darken(p.skin, 0.80);
+  ctx.fillRect(x+2*s+Math.ceil(s*0.35), y+s+Math.ceil(s*0.75), Math.ceil(s*0.35), Math.ceil(s*0.35));
 
-  // Subtle cheek tint (reads clearer at larger scale)
-  ctx.fillStyle = 'rgba(255,120,100,0.18)';
-  ctx.fillRect(x+s+Math.ceil(s*0.3), y+2*s, Math.ceil(s*0.8), Math.ceil(s*0.35));
-  ctx.fillRect(x+4*s-Math.ceil(s*0.2), y+2*s, Math.ceil(s*0.8), Math.ceil(s*0.35));
+  // ── Mouth ──────────────────────────────────────────────────────────
+  ctx.fillStyle = darken(p.skin, 0.72);
+  ctx.fillRect(x+2*s, y+2*s+Math.ceil(s*0.35), 2*s, Math.ceil(s*0.3));
+  ctx.fillStyle = lighten(p.skin, 1.06);
+  ctx.fillRect(x+2*s, y+2*s+Math.ceil(s*0.35), 2*s, 1);
 
-  // ── Beard (Tolba) ─────────────────────────────────────────────────
+  // ── Cheek blush ────────────────────────────────────────────────────
+  ctx.fillStyle = 'rgba(255,110,90,0.13)';
+  ctx.fillRect(x+s+Math.ceil(s*0.1), y+s+Math.ceil(s*0.75), Math.ceil(s*0.7), Math.ceil(s*0.4));
+  ctx.fillRect(x+4*s+Math.ceil(s*0.05), y+s+Math.ceil(s*0.75), Math.ceil(s*0.7), Math.ceil(s*0.4));
+
+  // ── Beard (Tolba) ──────────────────────────────────────────────────
   if(p.features.includes('beard')){
-    ctx.fillStyle = '#999';
-    ctx.fillRect(x+s+Math.ceil(s*0.5), y+2*s, 3*s, s);
-    ctx.fillRect(x+s, y+s+s, s, Math.ceil(s*0.5));
-    ctx.fillRect(x+4*s, y+s+s, s, Math.ceil(s*0.5));
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(x+s+Math.ceil(s*0.35), y+2*s, 3*s, Math.ceil(s*0.85));
+    ctx.fillRect(x+s, y+s+Math.ceil(s*0.8), Math.ceil(s*0.5), Math.ceil(s*0.6));
+    ctx.fillRect(x+4*s+Math.ceil(s*0.3), y+s+Math.ceil(s*0.8), Math.ceil(s*0.5), Math.ceil(s*0.6));
+    ctx.fillStyle = '#888';
+    ctx.fillRect(x+s+Math.ceil(s*0.5), y+2*s+Math.ceil(s*0.5), 2*s+Math.ceil(s*0.5), Math.ceil(s*0.35));
   }
 
   // ── Glasses (Moaz) ────────────────────────────────────────────────
   if(p.features.includes('glasses')){
-    ctx.strokeStyle = '#999';
-    ctx.lineWidth = Math.max(1, Math.ceil(s*0.3));
-    ctx.strokeRect(x+s, y+s, 2*s, s);
-    ctx.strokeRect(x+3*s, y+s, 2*s, s);
+    ctx.strokeStyle = '#aaa'; ctx.lineWidth = Math.max(1, Math.ceil(s*0.28));
+    ctx.strokeRect(x+s+Math.ceil(s*0.1), y+s-1, Math.ceil(s*1.8), Math.ceil(s*1.1));
+    ctx.strokeRect(x+3*s+Math.ceil(s*0.1), y+s-1, Math.ceil(s*1.8), Math.ceil(s*1.1));
     ctx.beginPath();
-    ctx.moveTo(x+3*s, y+s+Math.ceil(s*0.5));
-    ctx.lineTo(x+3*s+s, y+s+Math.ceil(s*0.5));
+    ctx.moveTo(x+3*s, y+s+Math.ceil(s*0.4));
+    ctx.lineTo(x+3*s+Math.ceil(s*0.1), y+s+Math.ceil(s*0.4));
     ctx.stroke();
+    ctx.fillStyle = 'rgba(150,220,255,0.12)';
+    ctx.fillRect(x+s+Math.ceil(s*0.1)+1, y+s, Math.ceil(s*1.8)-2, Math.ceil(s*1.1)-1);
+    ctx.fillRect(x+3*s+Math.ceil(s*0.1)+1, y+s, Math.ceil(s*1.8)-2, Math.ceil(s*1.1)-1);
   }
 
-  // ── Headset (Tarek / Carol) ───────────────────────────────────────
+  // ── Headset (Tarek / Carol) ────────────────────────────────────────
   if(p.features.includes('headset')){
-    ctx.fillStyle = '#333';
-    ctx.fillRect(x, y+s, s, s+1);           // left ear cup
-    ctx.fillRect(x+5*s, y+s, s, s+1);      // right ear cup
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(x, y+s, s, s+2);
+    ctx.fillRect(x+5*s, y+s, s, s+2);
+    ctx.fillStyle = '#444';
+    ctx.fillRect(x+s, y, 4*s, Math.ceil(s*0.45));
     ctx.fillStyle = '#555';
-    ctx.fillRect(x+s, y, 4*s, Math.ceil(s*0.4)); // band
+    ctx.fillRect(x, y+s+Math.ceil(s*0.2), Math.ceil(s*0.55), Math.ceil(s*0.55));
     ctx.fillStyle = p.accent || '#39ff14';
-    ctx.fillRect(x, y+s, Math.ceil(s*0.5), Math.ceil(s*0.5)); // LED dot
+    ctx.fillRect(x, y+s+1, Math.ceil(s*0.4), Math.ceil(s*0.4));
+    // Mic boom
+    ctx.fillStyle = '#333';
+    ctx.fillRect(x, y+s+s, Math.ceil(s*0.3), Math.ceil(s*0.8));
+    ctx.fillRect(x, y+s+s+Math.ceil(s*0.8), Math.ceil(s*0.6), Math.ceil(s*0.3));
   }
 
-  // ── Hard hat (Youssef Emad) ───────────────────────────────────────
+  // ── Hard hat (Youssef Emad) ────────────────────────────────────────
   if(p.features.includes('hard_hat')){
     ctx.fillStyle = '#ffcc00';
-    ctx.fillRect(x+s, y-s, 4*s, s);
-    ctx.fillRect(x,   y, s, Math.ceil(s*0.5));
-    ctx.fillRect(x+5*s, y, s, Math.ceil(s*0.5));
+    ctx.fillRect(x+s, y-s, 4*s, Math.ceil(s*1.2));
+    ctx.fillRect(x, y, Math.ceil(s*0.7), Math.ceil(s*0.5));
+    ctx.fillRect(x+5*s+Math.ceil(s*0.2), y, Math.ceil(s*0.7), Math.ceil(s*0.5));
     ctx.fillStyle = '#cc9900';
-    ctx.fillRect(x+s, y-s, 4*s, Math.ceil(s*0.3)); // hat brim shade
+    ctx.fillRect(x+s, y-s, 4*s, Math.ceil(s*0.35));
+    ctx.fillStyle = 'rgba(255,240,100,0.4)';
+    ctx.fillRect(x+2*s, y-s+Math.ceil(s*0.2), s, Math.ceil(s*0.3));
   }
 
   // ── Goggles (Seif) ────────────────────────────────────────────────
   if(p.features.includes('goggles')){
-    ctx.fillStyle = '#332200';
-    ctx.fillRect(x+s, y+s, 4*s, s+1);
-    ctx.fillStyle = 'rgba(255,136,0,0.6)';
-    ctx.fillRect(x+s+Math.ceil(s*0.3), y+s+Math.ceil(s*0.2), s, Math.ceil(s*0.6));
-    ctx.fillRect(x+3*s+Math.ceil(s*0.3), y+s+Math.ceil(s*0.2), s, Math.ceil(s*0.6));
+    ctx.fillStyle = '#2a1500';
+    ctx.fillRect(x+s, y+s, 4*s, s+2);
+    ctx.fillStyle = 'rgba(255,136,0,0.55)';
+    ctx.fillRect(x+s+Math.ceil(s*0.25), y+s+Math.ceil(s*0.2), Math.ceil(s*0.95), Math.ceil(s*0.6));
+    ctx.fillRect(x+3*s+Math.ceil(s*0.25), y+s+Math.ceil(s*0.2), Math.ceil(s*0.95), Math.ceil(s*0.6));
+    ctx.fillStyle = 'rgba(255,200,100,0.3)';
+    ctx.fillRect(x+s+Math.ceil(s*0.35), y+s+Math.ceil(s*0.25), Math.ceil(s*0.3), Math.ceil(s*0.3));
+    ctx.fillRect(x+3*s+Math.ceil(s*0.35), y+s+Math.ceil(s*0.25), Math.ceil(s*0.3), Math.ceil(s*0.3));
+    ctx.fillStyle = '#444';
+    ctx.fillRect(x+2*s, y+s+Math.ceil(s*0.4), s, Math.ceil(s*0.3));
   }
 
-  // ── Gold coat lapels (Dr. Tolba) ──────────────────────────────────
+  // ── Gold coat lapels (Dr. Tolba) ───────────────────────────────────
   if(p.features.includes('gold_coat')){
     ctx.fillStyle = '#ffcc00';
-    ctx.fillRect(x+s, y+3*s, Math.ceil(s*0.5), 3*s); // left lapel
-    ctx.fillRect(x+5*s-Math.ceil(s*0.5), y+3*s, Math.ceil(s*0.5), 3*s); // right lapel
+    ctx.fillRect(x+s, y+4*s, Math.ceil(s*0.6), 4*s);
+    ctx.fillRect(x+4*s+Math.ceil(s*0.35), y+4*s, Math.ceil(s*0.6), 4*s);
+    ctx.fillStyle = '#aa8800';
+    ctx.fillRect(x+s+Math.ceil(s*0.5), y+4*s, Math.ceil(s*0.1), 4*s);
+    // Epaulettes
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(x, y+4*s, s, Math.ceil(s*0.7));
+    ctx.fillRect(x+5*s, y+4*s, s, Math.ceil(s*0.7));
+    // Medal dot
+    ctx.fillStyle = '#ffdd44';
+    ctx.fillRect(x+2*s+Math.ceil(s*0.3), y+5*s+Math.ceil(s*0.3), Math.ceil(s*0.5), Math.ceil(s*0.5));
   }
 
-  // ── Command sash (Jomana) ─────────────────────────────────────────
+  // ── Command sash (Jomana) ──────────────────────────────────────────
   if(p.features.includes('command_sash')){
     ctx.fillStyle = '#ff006e';
-    ctx.fillRect(x+s, y+3*s, Math.ceil(s*0.5), 3*s);
+    ctx.fillRect(x+s, y+4*s, Math.ceil(s*0.6), 4*s);
+    ctx.fillStyle = 'rgba(255,0,110,'+(0.5+0.5*Math.sin(Date.now()/600))+')';
+    ctx.fillRect(x+s, y+4*s, Math.ceil(s*0.6), 4*s);
     ctx.fillStyle = '#ff44aa';
-    ctx.fillRect(x+s+1, y+4*s, Math.ceil(s*0.4), Math.ceil(s*0.3)); // sash badge
+    ctx.fillRect(x+s+1, y+5*s, Math.ceil(s*0.5), Math.ceil(s*0.4));
+    ctx.fillStyle = '#ffaadd';
+    ctx.fillRect(x+s+1, y+5*s, Math.ceil(s*0.3), Math.ceil(s*0.2));
   }
 
-  // ── Accent dot (role indicator) ───────────────────────────────────
+  // ── Accent dot (role indicator) ────────────────────────────────────
   if(p.accent){
     ctx.fillStyle = p.accent;
-    ctx.fillRect(x+5*s, y, s, Math.ceil(s*0.4));
+    ctx.fillRect(x+5*s, y, s, Math.ceil(s*0.45));
+    ctx.fillStyle = rgba(p.accent, 0.3);
+    ctx.fillRect(x+5*s-1, y-1, s+2, Math.ceil(s*0.45)+2);
   }
 
-  // ── Working tool flash ────────────────────────────────────────────
+  // ── Working tool flash ─────────────────────────────────────────────
   if(char.state === 'work' && char.kind !== 'robot'){
     ctx.fillStyle = p.accent || '#ffffff';
-    ctx.globalAlpha = 0.6 + 0.4*Math.sin(Date.now()/180);
+    ctx.globalAlpha = 0.55 + 0.45*Math.sin(Date.now()/180);
     ctx.fillRect(x+5*s+1, y+2*s, s, 2*s);
     ctx.globalAlpha = 1;
   }
 
   ctx.restore();
 };
+
+
 
 // ─── DRAW ROBOT (UR5e arm) ──────────────────────────────────────────
 P.drawRobot = function(ctx, robot, worldX, worldY, tick){
@@ -320,88 +466,185 @@ P.drawRobot = function(ctx, robot, worldX, worldY, tick){
 // ─── DRAW PORTRAIT (dossier) ────────────────────────────────────────
 P.drawPortrait = function(ctx, char, size){
   const p = char.portrait;
-  const s = Math.floor(size / 12);
+  const s = Math.floor(size / 14); // slightly smaller scale for more detail
   const w = size, h = size;
 
   ctx.clearRect(0,0,w,h);
-  ctx.fillStyle = '#0a0500';
+  
+  // High fidelity background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+  bgGrad.addColorStop(0, '#0a0a0f');
+  bgGrad.addColorStop(1, '#020406');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0,0,w,h);
 
-  ctx.strokeStyle = 'rgba(0,255,136,0.05)';
+  // Subtle grid overlay
+  ctx.strokeStyle = 'rgba(0,255,136,0.04)';
   ctx.lineWidth = 1;
   for(let i=0;i<w;i+=s*2){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); }
   for(let i=0;i<h;i+=s*2){ ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(w,i); ctx.stroke(); }
 
   if(char.kind==='robot'){
-    ctx.fillStyle='#555'; ctx.fillRect(3*s,4*s,6*s,7*s);
-    ctx.fillStyle='#666'; ctx.fillRect(4*s,2*s,4*s,3*s);
-    ctx.fillStyle='#444'; ctx.fillRect(2*s,5*s,s,4*s); ctx.fillRect(9*s,5*s,s,4*s);
-    ctx.fillRect(4*s,11*s,2*s,2*s); ctx.fillRect(6*s,11*s,2*s,2*s);
+    ctx.fillStyle='#333'; ctx.fillRect(3*s,4*s,8*s,8*s);
+    ctx.fillStyle='#555'; ctx.fillRect(4*s,2*s,6*s,4*s);
+    ctx.fillStyle='#222'; ctx.fillRect(2*s,5*s,2*s,5*s); ctx.fillRect(10*s,5*s,2*s,5*s);
+    ctx.fillRect(4*s,12*s,2*s,2*s); ctx.fillRect(8*s,12*s,2*s,2*s);
     ctx.fillStyle='#00d4ff';
-    ctx.fillRect(4*s+Math.floor(s/2),3*s,s,s);
-    ctx.fillRect(6*s+Math.floor(s/2),3*s,s,s);
+    ctx.fillRect(5*s,3*s,s+1,s+1);
+    ctx.fillRect(8*s,3*s,s+1,s+1);
     ctx.fillStyle='rgba(0,212,255,0.1)'; ctx.fillRect(0,0,w,h);
     return;
   }
 
   const cx = Math.floor(w/2);
-  ctx.fillStyle = p.pants||'#222';
-  ctx.fillRect(cx-2*s, 9*s, s+1, 3*s); ctx.fillRect(cx+s, 9*s, s+1, 3*s);
-  ctx.fillStyle = darken(p.pants||'#222',0.6);
-  ctx.fillRect(cx-2*s, 12*s, s+s, s); ctx.fillRect(cx+s, 12*s, s+s, s);
-  ctx.fillStyle = p.shirt;
-  ctx.fillRect(cx-3*s, 5*s, 6*s, 4*s);
-  ctx.fillRect(cx-4*s, 5*s, s, 3*s); ctx.fillRect(cx+3*s, 5*s, s, 3*s);
+  const px = cx - 3*s; // portrait anchor left
+  
+  // ── Shoulders & Shirt ────────────────────────────────────────────────
+  ctx.fillStyle = p.shirt || '#333';
+  ctx.fillRect(px - 2*s, 10*s, 10*s, 4*s);
+  // Shirt Highlight
+  ctx.fillStyle = lighten(p.shirt || '#333', 1.15);
+  ctx.fillRect(px - 2*s, 10*s, 1, 4*s);
+  ctx.fillRect(px - 2*s, 10*s, 10*s, 1);
+  // Shirt shadow
+  ctx.fillStyle = darken(p.shirt || '#333', 0.6);
+  ctx.fillRect(px + 6*s, 10*s, 2*s, 4*s);
+  // Collar
   ctx.fillStyle = p.skin;
-  ctx.fillRect(cx-s, 4*s, 2*s, s);
-  ctx.fillRect(cx-2*s, s, 4*s, 4*s);
+  ctx.fillRect(px + s, 9*s, 4*s, s);
 
+  // ── Neck ─────────────────────────────────────────────────────────────
+  ctx.fillStyle = p.skin;
+  ctx.fillRect(px + s, 7*s, 4*s, 2*s);
+  ctx.fillStyle = darken(p.skin, 0.82);
+  ctx.fillRect(px + 3*s, 7*s, 2*s, 2*s);
+
+  // ── Head ─────────────────────────────────────────────────────────────
+  ctx.fillStyle = p.skin;
+  ctx.fillRect(px, 2*s, 6*s, 5*s);
+  // Head Highlight
+  ctx.fillStyle = lighten(p.skin, 1.1);
+  ctx.fillRect(px, 2*s, 3*s, 1);
+  ctx.fillRect(px, 2*s, 1, 3*s);
+  // Head Shadow
+  ctx.fillStyle = darken(p.skin, 0.84);
+  ctx.fillRect(px + 5*s, 2*s, s, 5*s);
+
+  // ── Hair ─────────────────────────────────────────────────────────────
   if(p.hair && !p.features.includes('bald')){
     ctx.fillStyle = p.hair;
-    ctx.fillRect(cx-2*s, s, 4*s, s);
-    if(p.features.includes('long_hair')){ ctx.fillRect(cx-3*s, s+s, s, 3*s); ctx.fillRect(cx+2*s, s+s, s, 3*s); }
-    if(p.features.includes('hoodie')){ ctx.fillStyle=p.shirt; ctx.fillRect(cx-3*s,s,s,s); ctx.fillRect(cx+2*s,s,s,s); }
+    if(p.features.includes('long_hair')){
+      ctx.fillRect(px, s, 6*s, 2*s);
+      ctx.fillRect(px - s, 2*s, s, 5*s);
+      ctx.fillRect(px + 6*s, 2*s, s, 5*s);
+      ctx.fillRect(px - s, 7*s, 2*s, 3*s);
+      // Highlight
+      ctx.fillStyle = lighten(p.hair, 1.25);
+      ctx.fillRect(px + 2*s, s, 2*s, 1);
+    } else if(p.features.includes('hoodie')){
+      ctx.fillRect(px, s, 6*s, 2*s);
+      ctx.fillStyle = p.shirt;
+      ctx.fillRect(px - s, s+s, s, 6*s);
+      ctx.fillRect(px + 6*s, s+s, s, 6*s);
+    } else {
+      ctx.fillRect(px, s, 6*s, 2*s);
+      ctx.fillRect(px - s, s+s, s, 2*s);
+      // Highlight
+      ctx.fillStyle = lighten(p.hair, 1.25);
+      ctx.fillRect(px + 2*s, s, 2*s, 1);
+    }
   } else if(p.features.includes('bald')){
-    ctx.fillStyle=lighten(p.skin,1.15); ctx.fillRect(cx-s, s, 2*s, s);
+    ctx.fillStyle = lighten(p.skin, 1.15);
+    ctx.fillRect(px + 2*s, 2*s, 3*s, Math.ceil(s*0.8));
+    ctx.fillRect(px + 2*s, 2*s, s, 2);
   }
-  if(p.features.includes('beard')){ ctx.fillStyle='#999'; ctx.fillRect(cx-s,4*s,2*s+s,s); }
-  ctx.fillStyle='#111';
-  ctx.fillRect(cx-s, 2*s+s, s, s); ctx.fillRect(cx, 2*s+s, s, s);
-  ctx.fillStyle='#fff';
-  ctx.fillRect(cx-s+Math.floor(s*0.6), 2*s+s, Math.floor(s*0.4), Math.floor(s*0.4));
-  ctx.fillRect(cx+Math.floor(s*0.6), 2*s+s, Math.floor(s*0.4), Math.floor(s*0.4));
+
+  // ── Eyebrows ─────────────────────────────────────────────────────────
+  const browCol = p.hair ? darken(p.hair, 0.85) : darken(p.skin, 0.62);
+  if(!p.features.includes('bald')){
+    ctx.fillStyle = browCol;
+    ctx.fillRect(px + s, 3*s, Math.ceil(s*1.5), Math.ceil(s*0.6));
+    ctx.fillRect(px + 4*s, 3*s, Math.ceil(s*1.5), Math.ceil(s*0.6));
+  }
+
+  // ── Eyes ─────────────────────────────────────────────────────────────
+  ctx.fillStyle = '#111';
+  ctx.fillRect(px + s, 4*s, Math.ceil(s*1.5), Math.ceil(s*1.5));
+  ctx.fillRect(px + 4*s, 4*s, Math.ceil(s*1.5), Math.ceil(s*1.5));
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(px + s + Math.ceil(s*0.8), 4*s, Math.ceil(s*0.6), Math.ceil(s*0.6));
+  ctx.fillRect(px + 4*s + Math.ceil(s*0.8), 4*s, Math.ceil(s*0.6), Math.ceil(s*0.6));
+
+  // ── Nose ─────────────────────────────────────────────────────────────
+  ctx.fillStyle = darken(p.skin, 0.8);
+  ctx.fillRect(px + 3*s, 5*s, Math.ceil(s*0.8), Math.ceil(s*0.8));
+
+  // ── Cheek blush ──────────────────────────────────────────────────────
+  ctx.fillStyle = 'rgba(255,110,90,0.15)';
+  ctx.fillRect(px + Math.ceil(s*0.5), 5*s + Math.ceil(s*0.5), Math.ceil(s*1.2), s);
+  ctx.fillRect(px + 4*s + Math.ceil(s*0.5), 5*s + Math.ceil(s*0.5), Math.ceil(s*1.2), s);
+
+  // ── Mouth ────────────────────────────────────────────────────────────
+  ctx.fillStyle = darken(p.skin, 0.72);
+  ctx.fillRect(px + 2*s, 6*s, 2*s, Math.ceil(s*0.6));
+  ctx.fillStyle = lighten(p.skin, 1.06);
+  ctx.fillRect(px + 2*s, 6*s, 2*s, 1);
+
+  // ── Props ────────────────────────────────────────────────────────────
+  if(p.features.includes('beard')){
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(px + Math.ceil(s*0.5), 6*s, 5*s, s+s);
+    ctx.fillRect(px, 5*s, s, s+s);
+    ctx.fillRect(px + 5*s, 5*s, s, s+s);
+    ctx.fillStyle = '#888';
+    ctx.fillRect(px + s, 7*s, 4*s, Math.ceil(s*0.6));
+  }
   if(p.features.includes('glasses')){
-    ctx.strokeStyle='#888'; ctx.lineWidth=Math.max(1,Math.floor(s/2));
-    ctx.strokeRect(cx-s-Math.floor(s/2), 2*s+s, s+s, s+s);
-    ctx.strokeRect(cx+Math.floor(s/2), 2*s+s, s+s, s+s);
+    ctx.strokeStyle = '#aaa'; ctx.lineWidth = Math.max(1, Math.ceil(s*0.35));
+    ctx.strokeRect(px + Math.ceil(s*0.5), 4*s - 1, 2*s, Math.ceil(s*1.5));
+    ctx.strokeRect(px + 3*s + Math.ceil(s*0.5), 4*s - 1, 2*s, Math.ceil(s*1.5));
+    ctx.beginPath(); ctx.moveTo(px + 2*s + Math.ceil(s*0.5), 4*s + Math.ceil(s*0.5)); ctx.lineTo(px + 3*s + Math.ceil(s*0.5), 4*s + Math.ceil(s*0.5)); ctx.stroke();
+    ctx.fillStyle = 'rgba(150,220,255,0.12)';
+    ctx.fillRect(px + Math.ceil(s*0.5) + 1, 4*s, 2*s - 2, Math.ceil(s*1.5) - 1);
+    ctx.fillRect(px + 3*s + Math.ceil(s*0.5) + 1, 4*s, 2*s - 2, Math.ceil(s*1.5) - 1);
   }
   if(p.features.includes('headset')){
-    ctx.fillStyle='#333';
-    ctx.fillRect(cx-3*s,2*s,s,2*s); ctx.fillRect(cx+2*s,2*s,s,2*s);
-    ctx.fillStyle=p.accent||'#39ff14';
-    ctx.fillRect(cx-3*s,2*s,Math.max(1,Math.floor(s/2)),Math.max(1,Math.floor(s/2)));
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(px - s, 3*s, s, 3*s); ctx.fillRect(px + 6*s, 3*s, s, 3*s);
+    ctx.fillStyle = '#444';
+    ctx.fillRect(px, 2*s, 6*s, Math.ceil(s*0.6));
+    ctx.fillStyle = p.accent || '#39ff14';
+    ctx.fillRect(px - s, 3*s + 1, Math.ceil(s*0.6), Math.ceil(s*0.6));
+    // Mic boom
+    ctx.fillStyle = '#333';
+    ctx.fillRect(px - s, 5*s, Math.ceil(s*0.5), Math.ceil(s*1.5));
+    ctx.fillRect(px - s, 5*s + Math.ceil(s*1.5), s, Math.ceil(s*0.6));
   }
   if(p.features.includes('hard_hat')){
-    ctx.fillStyle='#ffcc00';
-    ctx.fillRect(cx-3*s,s,6*s,s); ctx.fillRect(cx-2*s,0,4*s,s);
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(px - s, 0, 8*s, 2*s);
+    ctx.fillRect(px - 2*s, s+s, 10*s, s);
   }
   if(p.features.includes('goggles')){
-    ctx.fillStyle='#332200'; ctx.fillRect(cx-2*s,2*s+s,4*s,s);
-    ctx.fillStyle='rgba(255,136,0,0.6)';
-    ctx.fillRect(cx-s,2*s+s,s,s); ctx.fillRect(cx,2*s+s,s,s);
-  }
-  if(p.accent){
-    ctx.fillStyle=p.accent; ctx.fillRect(w-2*s,0,2*s,4*s);
-    ctx.fillStyle=`${p.accent}22`; ctx.fillRect(0,h-2*s,w,2*s);
+    ctx.fillStyle = '#2a1500'; ctx.fillRect(px, 3*s, 6*s, 2*s);
+    ctx.fillStyle = 'rgba(255,136,0,0.55)';
+    ctx.fillRect(px + Math.ceil(s*0.5), 3*s + Math.ceil(s*0.4), 2*s, Math.ceil(s*1.2));
+    ctx.fillRect(px + 3*s + Math.ceil(s*0.5), 3*s + Math.ceil(s*0.4), 2*s, Math.ceil(s*1.2));
+    ctx.fillStyle = 'rgba(255,200,100,0.3)';
+    ctx.fillRect(px + s, 4*s, Math.ceil(s*0.6), Math.ceil(s*0.6));
+    ctx.fillRect(px + 4*s, 4*s, Math.ceil(s*0.6), Math.ceil(s*0.6));
   }
   if(p.features.includes('gold_coat')){
-    ctx.fillStyle='#ffcc00'; ctx.fillRect(cx-3*s,5*s,s,4*s); ctx.fillRect(cx+2*s,5*s,s,4*s);
+    ctx.fillStyle = '#ffcc00'; ctx.fillRect(px - s, 10*s, s, 4*s); ctx.fillRect(px + 6*s, 10*s, s, 4*s);
   }
   if(p.features.includes('command_sash')){
-    ctx.fillStyle='#ff006e'; ctx.fillRect(cx-3*s,6*s,s,3*s);
+    ctx.fillStyle = '#ff006e'; ctx.fillRect(px - s, 10*s, 2*s, 4*s);
   }
-  if(p.features.includes('tall')){
-    ctx.fillStyle=p.accent||'#ff8844'; ctx.fillRect(w-s,0,s,h);
+  
+  // ── Overlay accents ──────────────────────────────────────────────────
+  if(p.accent){
+    ctx.fillStyle = p.accent; ctx.fillRect(w - 2*s, 0, 2*s, 5*s);
+    ctx.fillStyle = rgba(p.accent, 0.3); ctx.fillRect(0, h - 2*s, w, 2*s);
   }
 };
 
@@ -589,27 +832,34 @@ P.drawRoom = function(ctx, room, rx, ry, rw, rh, pulse, tick){
     ctx.restore();
   }
 
-  // ── Radial ambient glow ──────────────────────────────────────────────
+  // ── Radial ambient glow (Brighter, richer) ──────────────────────────
   try {
-    const grd = ctx.createRadialGradient(rx+rw/2, ry+rh/2, 0, rx+rw/2, ry+rh/2, rw*0.6);
-    grd.addColorStop(0, rgba(c.glow, 0.12));
+    const grd = ctx.createRadialGradient(rx+rw/2, ry+rh/2, 0, rx+rw/2, ry+rh/2, rw*0.75);
+    grd.addColorStop(0, rgba(c.glow, 0.25));
+    grd.addColorStop(0.5, rgba(c.glow, 0.10));
     grd.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grd;
+    ctx.fillRect(rx, ry, rw, rh);
+    // Pulse layer
+    const pgrd = ctx.createRadialGradient(rx+rw/2, ry+rh/2, 0, rx+rw/2, ry+rh/2, rw*0.5);
+    pgrd.addColorStop(0, rgba(c.accent, 0.15 * pulse));
+    pgrd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pgrd;
     ctx.fillRect(rx, ry, rw, rh);
   } catch(e){}
 
   // ── Edge depth shadows (left/right walls) ────────────────────────────
-  const makeH = ctx.createLinearGradient(rx, 0, rx+18, 0);
-  makeH.addColorStop(0, 'rgba(0,0,0,0.38)');
+  const makeH = ctx.createLinearGradient(rx, 0, rx+24, 0);
+  makeH.addColorStop(0, 'rgba(0,0,0,0.5)');
   makeH.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = makeH;
-  ctx.fillRect(rx, floorY, 18, floorH);
+  ctx.fillRect(rx, floorY, 24, floorH);
 
-  const makeH2 = ctx.createLinearGradient(rx+rw, 0, rx+rw-18, 0);
-  makeH2.addColorStop(0, 'rgba(0,0,0,0.38)');
+  const makeH2 = ctx.createLinearGradient(rx+rw, 0, rx+rw-24, 0);
+  makeH2.addColorStop(0, 'rgba(0,0,0,0.5)');
   makeH2.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = makeH2;
-  ctx.fillRect(rx+rw-18, floorY, 18, floorH);
+  ctx.fillRect(rx+rw-24, floorY, 24, floorH);
 
   // Bottom shadow
   const makeV = ctx.createLinearGradient(0, ry+rh, 0, ry+rh-18);
@@ -618,73 +868,119 @@ P.drawRoom = function(ctx, room, rx, ry, rw, rh, pulse, tick){
   ctx.fillStyle = makeV;
   ctx.fillRect(rx, ry+rh-18, rw, 18);
 
-  // ── Wall-mounted monitors (top of wall panel) ───────────────────────
-  const monW = 22, monH = 14, monGap = 4;
-  const monStart = rx + 16;
-  const monCount = Math.floor((rw - 32) / (monW + monGap));
+  // ── Wall-mounted monitors + status strip (richer details) ───────────
+  const monW = 24, monH = 16, monGap = 5;
+  const monRowY = ry + 12;
+  const monStart = rx + 14;
+  const monCount = Math.floor((rw - 28) / (monW + monGap));
   for(let mi = 0; mi < monCount; mi++){
     const mx = monStart + mi * (monW + monGap);
-    const my = ry + 18;
+    const my = monRowY;
     // bezel
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = '#020408';
     ctx.fillRect(mx, my, monW, monH);
-    ctx.strokeStyle = darken(c.bg, 0.20);
+    ctx.strokeStyle = darken(c.bg, 0.10);
     ctx.lineWidth = 1;
     ctx.strokeRect(mx, my, monW, monH);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(mx+1, my+1, monW-2, 1);
+    
     // screen
-    const screenOn = Math.sin(tick/30 + mi*0.7) > -0.6;
+    const screenOn = Math.sin(tick/25 + mi*1.1) > -0.5;
     if(screenOn){
-      ctx.fillStyle = rgba(c.glow, 0.55);
+      const sbg = ctx.createLinearGradient(mx, my, mx, my+monH);
+      sbg.addColorStop(0, rgba(c.glow, 0.6));
+      sbg.addColorStop(1, rgba(c.glow, 0.2));
+      ctx.fillStyle = sbg;
       ctx.fillRect(mx+1, my+1, monW-2, monH-2);
+      
+      // Animated graphs / text
       ctx.fillStyle = c.accent;
-      // tiny content lines
-      ctx.fillRect(mx+2, my+3, Math.floor((monW-4)*(0.4+0.5*((mi*7)%5)/5)), 1);
-      ctx.fillRect(mx+2, my+6, Math.floor((monW-4)*(0.5+0.4*((mi*11)%4)/4)), 1);
-      ctx.fillRect(mx+2, my+9, Math.floor((monW-4)*(0.3+0.6*((mi*13)%6)/6)), 1);
+      const t1 = tick/10 + mi*7;
+      ctx.fillRect(mx+2, my+3, Math.floor((monW-4)*(0.3+0.4*Math.sin(t1))), 1);
+      ctx.fillRect(mx+2, my+6, Math.floor((monW-4)*(0.5+0.3*Math.cos(t1*1.3))), 1);
+      ctx.fillRect(mx+2, my+9, Math.floor((monW-4)*(0.4+0.5*Math.sin(t1*0.8))), 1);
+      // Status dot
+      ctx.fillStyle = Math.sin(t1*2)>0 ? '#fff' : '#ff0044';
+      ctx.fillRect(mx+monW-4, my+monH-4, 2, 2);
     } else {
-      ctx.fillStyle = darken(c.bg, 0.35);
+      ctx.fillStyle = darken(c.bg, 0.45);
       ctx.fillRect(mx+1, my+1, monW-2, monH-2);
     }
     // mount stem
-    ctx.fillStyle = darken(c.bg, 0.30);
-    ctx.fillRect(mx + monW/2 - 1, my + monH, 2, 3);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(mx + monW/2 - 2, my + monH, 4, 4);
+    ctx.fillStyle = darken(c.bg, 0.20);
+    ctx.fillRect(mx + monW/2 - 1, my + monH, 2, 4);
   }
-  // Secondary status strip (smaller screens under main row)
-  const subMy = ry + wallH - 14;
-  for(let si = 0; si < Math.min(8, monCount + 2); si++){
-    const smx = rx + 10 + si * Math.floor((rw - 20) / 8);
-    ctx.fillStyle = '#080808';
-    ctx.fillRect(smx, subMy, 14, 8);
-    ctx.strokeStyle = rgba(c.border, 0.35);
-    ctx.strokeRect(smx, subMy, 14, 8);
-    const bars = 3 + (si % 3);
-    ctx.fillStyle = rgba(c.glow, 0.25 + 0.2 * Math.sin(tick/20 + si));
+  
+  // Databanks / Sub-panels under monitors
+  const subH = 8;
+  const subMy = monRowY + monH + 5;
+  for(let si = 0; si < Math.min(10, monCount + 3); si++){
+    const smx = rx + 8 + si * Math.floor((rw - 16) / 10);
+    ctx.fillStyle = '#04060a';
+    ctx.fillRect(smx, subMy, 14, subH);
+    ctx.strokeStyle = rgba(c.border, 0.45);
+    ctx.strokeRect(smx, subMy, 14, subH);
+    const bars = 4;
     for(let b=0; b<bars; b++){
+      const on = Math.sin(tick/12 + si*3 + b) > 0;
+      ctx.fillStyle = on ? rgba(c.glow, 0.8) : rgba(c.glow, 0.1);
       ctx.fillRect(smx + 2 + b*3, subMy + 2, 2, 4);
     }
   }
 
-  // ── Vertical LED strips on side walls ────────────────────────────────
-  const ledTop = floorY + 6;
-  const ledBot = ry + rh - 12;
+  // Room titles are drawn in HTML (#room-labels-layer) so they stay crisp above all canvas layers.
+
+  // ── Vertical LED strips on side walls (enhanced) ─────────────────────
+  const ledTop = floorY + 8;
+  const ledBot = ry + rh - 16;
   const ledH = ledBot - ledTop;
   // Left strip
   ctx.fillStyle = '#000';
-  ctx.fillRect(rx+3, ledTop, 3, ledH);
-  for(let li=0; li<Math.floor(ledH/8); li++){
-    const ly = ledTop + li*8;
-    const on = Math.sin(tick/15 + li*0.5) > 0;
-    ctx.fillStyle = on ? c.accent : darken(c.accent, 0.35);
-    ctx.fillRect(rx+4, ly+1, 1, 5);
+  ctx.fillRect(rx+2, ledTop, 5, ledH);
+  ctx.strokeStyle = rgba(c.border,0.3); ctx.strokeRect(rx+2, ledTop, 5, ledH);
+  for(let li=0; li<Math.floor(ledH/6); li++){
+    const ly = ledTop + li*6;
+    const on = Math.sin(tick/12 + li*0.4) > -0.2;
+    ctx.fillStyle = on ? c.accent : darken(c.accent, 0.4);
+    ctx.fillRect(rx+4, ly+1, 2, 3);
+    if(on){
+      ctx.fillStyle = rgba(c.accent, 0.4);
+      ctx.fillRect(rx+1, ly, 7, 5);
+    }
   }
   // Right strip
-  ctx.fillRect(rx+rw-6, ledTop, 3, ledH);
-  for(let li2=0; li2<Math.floor(ledH/8); li2++){
-    const ly2 = ledTop + li2*8;
-    const on2 = Math.sin(tick/15 + li2*0.5 + 1) > 0;
-    ctx.fillStyle = on2 ? c.accent : darken(c.accent, 0.35);
-    ctx.fillRect(rx+rw-5, ly2+1, 1, 5);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(rx+rw-7, ledTop, 5, ledH);
+  ctx.strokeStyle = rgba(c.border,0.3); ctx.strokeRect(rx+rw-7, ledTop, 5, ledH);
+  for(let li2=0; li2<Math.floor(ledH/6); li2++){
+    const ly2 = ledTop + li2*6;
+    const on2 = Math.sin(tick/12 + li2*0.4 + 2) > -0.2;
+    ctx.fillStyle = on2 ? c.accent : darken(c.accent, 0.4);
+    ctx.fillRect(rx+rw-5, ly2+1, 2, 3);
+    if(on2){
+      ctx.fillStyle = rgba(c.accent, 0.4);
+      ctx.fillRect(rx+rw-8, ly2, 7, 5);
+    }
   }
+  
+  // ── Floor Scanning Laser Grid ─────────────────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rx+8, floorY+8, rw-16, floorH-16);
+  ctx.clip();
+  const scanY = floorY + 8 + (tick*1.5 % (floorH-16));
+  const sGrad = ctx.createLinearGradient(0, scanY-10, 0, scanY+10);
+  sGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  sGrad.addColorStop(0.5, rgba(c.accent, 0.3));
+  sGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sGrad;
+  ctx.fillRect(rx+8, scanY-10, rw-16, 20);
+  ctx.fillStyle = rgba(c.accent, 0.8);
+  ctx.fillRect(rx+8, scanY, rw-16, 1);
+  ctx.restore();
 
   // ── Floor circuit traces (subtle cyan grid lines) ───────────────────
   ctx.strokeStyle = rgba(c.glow, 0.18);
@@ -743,27 +1039,34 @@ P.drawRoom = function(ctx, room, rx, ry, rw, rh, pulse, tick){
     ctx.fillStyle = rgba(c.accent, 0.9);
     ctx.fillRect(px, pipeY2, 6, 2);
   }
-  // Hanging light fixtures
-  const lightCount = 3;
+  // Hanging light fixtures (Brighter, more volumetric)
+  const lightCount = 4;
   for(let li=0; li<lightCount; li++){
     const lx = rx + Math.floor(rw*(li+1)/(lightCount+1));
-    ctx.fillStyle = darken(c.bg, 0.30);
+    ctx.fillStyle = darken(c.bg, 0.40);
     ctx.fillRect(lx-1, ry+15, 2, 6);
-    ctx.fillStyle = rgba(c.glow, 0.35 + 0.25*Math.sin(tick/30+li));
-    ctx.beginPath(); ctx.arc(lx, ry+24, 4, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(lx-1, ry+23, 2, 2);
-    // light cone on floor (subtle)
-    try {
-      const cone = ctx.createLinearGradient(lx, ry+25, lx, floorY+30);
-      cone.addColorStop(0, rgba(c.glow, 0.10));
-      cone.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = cone;
-      ctx.beginPath();
-      ctx.moveTo(lx-1, ry+25); ctx.lineTo(lx+1, ry+25);
-      ctx.lineTo(lx+10, floorY+30); ctx.lineTo(lx-10, floorY+30);
-      ctx.closePath(); ctx.fill();
-    } catch(e){}
+    ctx.fillStyle = '#000';
+    ctx.fillRect(lx-2, ry+21, 4, 2);
+    
+    const fOn = Math.sin(tick/20 + li) > -0.8; // Flicker
+    if(fOn){
+      ctx.fillStyle = rgba(c.glow, 0.6 + 0.3*Math.sin(tick/10+li));
+      ctx.beginPath(); ctx.arc(lx, ry+24, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(lx-1, ry+23, 2, 2);
+      
+      // Volumetric light cone
+      try {
+        const cone = ctx.createLinearGradient(lx, ry+25, lx, floorY+40);
+        cone.addColorStop(0, rgba(c.glow, 0.35));
+        cone.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = cone;
+        ctx.beginPath();
+        ctx.moveTo(lx-2, ry+25); ctx.lineTo(lx+2, ry+25);
+        ctx.lineTo(lx+18, floorY+40); ctx.lineTo(lx-18, floorY+40);
+        ctx.closePath(); ctx.fill();
+      } catch(e){}
+    }
   }
 
   // ── Floor grates (decorative strips at edges) ────────────────────────
@@ -780,33 +1083,43 @@ P.drawRoom = function(ctx, room, rx, ry, rw, rh, pulse, tick){
     ctx.stroke();
   }
   // Caution strip along deck edge (under wall)
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(rx+4, floorY+2, rw-8, 4);
-  for(let cz = 0; cz < Math.floor((rw-8)/8); cz++){
-    ctx.fillStyle = (cz % 2 === 0) ? 'rgba(255,200,0,0.35)' : 'rgba(30,25,10,0.5)';
-    ctx.fillRect(rx+4+cz*8, floorY+2, 8, 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(rx+4, floorY+2, rw-8, 6);
+  for(let cz = 0; cz < Math.floor((rw-8)/10); cz++){
+    ctx.fillStyle = (cz % 2 === 0) ? 'rgba(255,200,0,0.5)' : 'rgba(30,25,10,0.7)';
+    ctx.fillRect(rx+4+cz*10, floorY+2, 10, 6);
   }
 
   // ── Wall corner rivets + edge bolt rows ─────────────────────────────
-  ctx.fillStyle = rgba(c.accent, 0.6);
+  ctx.fillStyle = rgba(c.accent, 0.8);
   [[rx+5,ry+5],[rx+rw-7,ry+5],[rx+5,floorY-7],[rx+rw-7,floorY-7]].forEach(function(pt){
     ctx.fillRect(pt[0], pt[1], 2, 2);
+    ctx.fillStyle = '#fff'; ctx.fillRect(pt[0], pt[1], 1, 1); ctx.fillStyle = rgba(c.accent, 0.8);
   });
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
   for(let eb = 10; eb < rw - 10; eb += 9){
     ctx.fillRect(rx + eb, ry + 3, 1, 1);
     ctx.fillRect(rx + eb, floorY - 5, 1, 1);
   }
 
-  // ── Ambient sparks (occasional) ─────────────────────────────────────
-  if((tick + (rx|0)) % 90 < 6){
-    const sx = rx + 30 + (tick*7 % (rw-60));
-    const sy = floorY + 10 + ((tick*3) % (floorH-20));
-    ctx.fillStyle = '#ffee88';
+  // ── Ambient sparks & dust (more prominent) ──────────────────────────
+  if((tick + (rx|0)) % 60 < 8){
+    const sx = rx + 20 + (tick*7 % (rw-40));
+    const sy = floorY + 10 + ((tick*4) % (floorH-20));
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(sx, sy, 2, 2);
-    ctx.fillStyle = 'rgba(255,200,80,0.5)';
-    ctx.fillRect(sx-2, sy-2, 6, 6);
+    ctx.fillStyle = 'rgba(255,220,100,0.8)';
+    ctx.fillRect(sx-1, sy-1, 4, 4);
+    ctx.fillStyle = 'rgba(255,150,50,0.4)';
+    ctx.fillRect(sx-3, sy-3, 8, 8);
   }
+  for(let p=0; p<4; p++){
+    const dx = rx + 10 + ((tick*1.3 + p*137) % (rw-20));
+    const dy = floorY + 10 + ((tick*0.8 + p*73) % (floorH-20));
+    ctx.fillStyle = 'rgba(150,200,255,0.15)';
+    ctx.fillRect(dx, dy, 2, 2);
+  }
+
 
   // ── Border & special treatments ──────────────────────────────────────
   if(room.isCaptain){
@@ -820,9 +1133,9 @@ P.drawRoom = function(ctx, room, rx, ry, rw, rh, pulse, tick){
     ctx.lineWidth = 1;
     ctx.strokeRect(rx+5, ry+5, rw-10, rh-10);
     ctx.fillStyle = '#ffcc00';
-    ctx.font = 'bold 18px monospace';
+    ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('★', rx+rw/2, ry+18);
+    ctx.fillText('★', rx + rw - 14, monRowY + 8);
     ctx.textAlign = 'left';
   } else {
     ctx.strokeStyle = c.border;

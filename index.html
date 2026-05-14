@@ -48,19 +48,26 @@
     <div id="alert-banner">⚠ SYSTEM ALERT</div>
 
     <button class="hud-btn" onclick="GAME.openSettings()">⚙ SETTINGS</button>
-    <a href="dossiers.html" class="hud-btn" style="text-decoration:none">📋 DOSSIERS</a>
+    <a href="dossiers.html" class="hud-btn" style="text-decoration:none" onclick="if(window.GAME&amp;&amp;GAME.captureBridgeSessionForDossiers)GAME.captureBridgeSessionForDossiers();">📋 DOSSIERS</a>
+    <button class="hud-btn" onclick="typeof GAME!=='undefined'&&GAME.hud&&GAME.hud.openOps()">◎ OPS</button>
     <button class="hud-btn" onclick="GAME.hud.addLog('HELP','Hover crew = tooltip. Click crew = dossier. Robot patrols 24/7. Try Konami code: ↑↑↓↓←→←→BA','log-success')">? HELP</button>
   </div>
 
   <!-- LEFT PANEL: Mission Log -->
   <div id="panel-left">
     <div class="panel-header">◈ MISSION LOG</div>
+    <div class="kpi-strip" id="kpi-strip">
+      <span class="kpi-pill" id="kpi-ach" title="Achievements unlocked">ACH —</span>
+      <span class="kpi-pill" id="kpi-dossier" title="Crew dossiers opened">DOSSIER 0/14</span>
+      <span class="kpi-pill kpi-warn" id="kpi-robot" title="Logged robot grasp warnings">GRASP FAILS 0</span>
+    </div>
     <div id="mission-log"></div>
   </div>
 
   <!-- CANVAS -->
   <div id="canvas-wrap">
     <canvas id="game-canvas"></canvas>
+    <div id="room-labels-layer" aria-hidden="true"></div>
   </div>
 
   <!-- RIGHT PANEL: Crew Comms -->
@@ -77,13 +84,14 @@
 
   <!-- BOTTOM BUTTONS -->
   <div id="bottom-bar">
-    <a href="dossiers.html" class="bottom-btn">📋 DOSSIERS</a>
+    <button type="button" class="bottom-btn accent" onclick="typeof GAME!=='undefined'&&GAME.hud&&GAME.hud.openOps()" title="Operator guide, achievements, ship KPIs">◎ OPS CENTER</button>
+    <a href="dossiers.html" class="bottom-btn" onclick="if(window.GAME&amp;&amp;GAME.captureBridgeSessionForDossiers)GAME.captureBridgeSessionForDossiers();">📋 DOSSIERS</a>
     <button id="move-mode-btn" class="bottom-btn" onclick="GAME.toggleMoveMode()" title="Toggle move mode (M key) — select crew, click room to move them">🚀 MOVE CREW</button>
     <button class="bottom-btn" onclick="GAME.callRobot()" title="Send robot to deliver coffee to Dr. Tolba with Tarek's message">🤖 CALL ROBOT</button>
     <button class="bottom-btn" onclick="GAME.allHandsOnDeck()" title="Everyone returns to their home station immediately">📣 ALL HANDS</button>
     <button id="chill-btn" class="bottom-btn" onclick="GAME.chillTime()" title="Mess: 2–3 invited + robot. Moaz & Hemaly stay in TA lab. Chill caps: voice booth max 3 humans; other rooms max 3 (TA lab 2). Click again to end.">☕ CHILL TIME</button>
     <button class="bottom-btn" onclick="GAME.hud.showToast('[SYS] All systems nominal. Robot operational. Crew accounted for.','info','SYS')">⚡ STATUS</button>
-    <button class="bottom-btn" onclick="GAME.hud.triggerKonami()">🎮 ?????</button>
+    <button class="bottom-btn" onclick="typeof GAME!=='undefined'&&GAME.hud&&GAME.hud.showKonamiCredits()">🎮 ?????</button>
     <button class="bottom-btn" onclick="GAME.openSettings()">⚙ SETTINGS</button>
     <button class="bottom-btn danger" onclick="if(confirm('Reset all save data?')){GAME.save.reset();location.reload();}">⚠ RESET</button>
   </div>
@@ -143,6 +151,61 @@
     <div style="margin-top:16px">
       <button class="bottom-btn" onclick="GAME.closeSettings()">✕ CLOSE</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ OPS CENTER MODAL (click dim area to close) ═══ -->
+<div id="ops-modal" onclick="if(event.target===this)GAME.hud.closeOps()">
+  <div class="ops-dialog" role="dialog" aria-modal="true" aria-labelledby="ops-modal-title" onclick="event.stopPropagation()">
+    <div class="ops-modal-head">
+      <div>
+        <div class="ops-modal-kicker">USS UR5e · CREW OPERATIONS</div>
+        <h2 class="ops-modal-title" id="ops-modal-title">OPS CENTER</h2>
+      </div>
+      <button type="button" class="ops-modal-close" onclick="GAME.hud.closeOps()">✕</button>
+    </div>
+    <div class="ops-tabs">
+      <button type="button" class="ops-tab active" data-ops="guide" onclick="GAME.hud.switchOpsTab('guide')">OPERATOR GUIDE</button>
+      <button type="button" class="ops-tab" data-ops="ach" onclick="GAME.hud.switchOpsTab('ach')">ACHIEVEMENTS</button>
+      <button type="button" class="ops-tab" data-ops="kpi" onclick="GAME.hud.switchOpsTab('kpi')">SHIP KPIs</button>
+    </div>
+    <div class="ops-body">
+      <div id="ops-panel-guide" class="ops-panel active">
+        <p class="ops-lead">You are observing the GIU Robotics <strong>USS UR5e</strong> simulation: ROS2 Humble, MoveIt2, voice stack, and a crew that definitely has opinions.</p>
+        <h3 class="ops-h3">Deck &amp; rooms</h3>
+        <p>Each cell is a compartment with a <strong>nameplate</strong> (icon + title + subtitle). Crew start in their home rooms; the robot patrols on a fixed route through engineering, lab, voice booth, mess, and cargo.</p>
+        <h3 class="ops-h3">Crew</h3>
+        <p><strong>Hover</strong> a character for a live line from their file. <strong>Click</strong> to open the classified dossier. <strong>Decor</strong> in each room has tooltips — explore the set dressing.</p>
+        <h3 class="ops-h3">Action bar</h3>
+        <ul class="ops-list">
+          <li><strong>MOVE CREW</strong> — Select a member, then click a destination room (or press M).</li>
+          <li><strong>CALL ROBOT</strong> — Coffee delivery to Dr. Tolba with Tarek’s legendary voice line.</li>
+          <li><strong>ALL HANDS</strong> — Everyone snaps back to home stations; ends ☕ chill if active.</li>
+          <li><strong>CHILL TIME</strong> — Mess-hall break: invited crew + robot; Moaz &amp; Hemaly stay on TA lab duty.</li>
+        </ul>
+        <h3 class="ops-h3">Panels</h3>
+        <p><strong>Mission log</strong> — System and ROS2 style events. <strong>Crew comms</strong> — Radio chatter, scripted scenes by ship hour, room banter, and robot lines. <strong>Ship status ticker</strong> — Rotating mission + flavor headlines.</p>
+        <h3 class="ops-h3">Time &amp; cycle</h3>
+        <p><strong>Ship time</strong> advances slowly in-universe (not wall clock). <strong>Day / night</strong> follows local hour for the viewport tint (deep night 02:00–05:00).</p>
+        <h3 class="ops-h3">Secrets</h3>
+        <p>Use <strong>◎ OPS</strong> here anytime. Konami on keyboard or the <strong>?????</strong> button opens classified credits (works every time). Maryam may show a night-only note in dossiers when the ship is in night cycle.</p>
+      </div>
+      <div id="ops-panel-ach" class="ops-panel">
+        <p class="ops-muted">Progress is saved in this browser. ● = unlocked.</p>
+        <div id="ops-ach-list"></div>
+      </div>
+      <div id="ops-panel-kpi" class="ops-panel">
+        <p class="ops-muted">Live snapshot — updates when you open this panel; HUD strip updates live.</p>
+        <div id="ops-kpi-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ KONAMI / CREDITS (separate from dossier modal) ═══ -->
+<div id="konami-modal" onclick="if(event.target===this)GAME.hud.closeKonamiCredits()">
+  <div class="konami-dialog" onclick="event.stopPropagation()">
+    <div id="konami-dialog-content"></div>
   </div>
 </div>
 

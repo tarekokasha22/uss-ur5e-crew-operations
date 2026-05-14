@@ -454,6 +454,18 @@ function tickHuman(c, dt, isNight, tick){
     return;
   }
 
+  // TAs stay in TA lab during work (until you move them in MOVE mode or ☕ chill flow)
+  if(!AI.chillTimeActive && (c.id === 'moaz' || c.id === 'hemaly') && c.room !== 'ta_lab'){
+    c.room = 'ta_lab';
+    var taR = GAME.roomMap['ta_lab'];
+    if(taR){
+      startWalkTo(c, taR);
+      c.state = 'walk';
+      c.timer = rand(1500, 2800);
+    }
+    return;
+  }
+
   switch(c.state){
     case 'idle':
       // During chill time, crew in mess hall stay put
@@ -470,26 +482,37 @@ function tickHuman(c, dt, isNight, tick){
         c.state = 'wander';
         c.timer = rand(1000, 2500);
       }
-      // Occasionally visit social room (disabled during ☕ chill — nudge + scripted convos handle that)
-      else if(!AI.chillTimeActive && Math.random() < 0.032){
-        var chillRoom = GAME.roomMap['medbay_mess'];
-        var obsRoom   = GAME.roomMap['airlock_observation'];
-        // Check chill room capacity
-        var chillOccupants = countInRoom('medbay_mess');
-        var target;
-        if(c.id !== 'moaz' && c.id !== 'hemaly' && chillOccupants < 3 && Math.random() < 0.7){
-          target = chillRoom;
-        } else {
-          target = obsRoom;
+      // Work mode: stay in assigned compartment (no random mess / airlock trips).
+      // Rare: visit captain's cabin or TA lab when the host is present (others may join them).
+      else if(!AI.chillTimeActive && c.id !== 'tolba' && c.id !== 'moaz' && c.id !== 'hemaly' && Math.random() < 0.0045){
+        var wantCabin = Math.random() < 0.42;
+        var targetId = wantCabin ? 'captains_cabin' : 'ta_lab';
+        var targetRoom = GAME.roomMap[targetId];
+        if(targetRoom && c.homeRoom !== targetId){
+          var hostPresent = wantCabin
+            ? GAME.crew.some(function(x){ return x.id === 'tolba' && x.room === 'captains_cabin'; })
+            : GAME.crew.some(function(x){ return (x.id === 'moaz' || x.id === 'hemaly') && x.room === 'ta_lab'; });
+          if(hostPresent){
+            c.room = targetId;
+            startWalkTo(c, targetRoom);
+            c.state = 'eating';
+            c.timer = rand(6500, 13000);
+            var transitLine = pickFrom([
+              'quick word with the captain',
+              'dropping a form off',
+              'need a signature',
+              'TA office hours… technically',
+              'bench consult',
+              'oscilloscope diplomacy',
+            ]);
+            emitBubble(c, transitLine);
+            GAME.hud.addChatEntry(c.id, transitLine + ' → ' + targetRoom.name);
+            break;
+          }
         }
-        var oldRoom = c.room;
-        c.room = target.id;
-        startWalkTo(c, target);
-        c.state = 'eating';
-        c.timer = rand(7000, 14000);
-        var transitMsgs = TRANSIT_MSGS[target.id] || ['on my way...'];
-        emitBubble(c, pickFrom(transitMsgs));
-        GAME.hud.addChatEntry(c.id, 'heading to ' + target.name);
+        startWanderInRoom(c);
+        c.state = 'wander';
+        c.timer = rand(1200, 3000);
       } else {
         startWanderInRoom(c);
         c.state = 'wander';
@@ -568,6 +591,7 @@ function tickRobot(r, dt, tick){
         r.graspFailCount = (r.graspFailCount||0)+1;
         GAME.save.set('robotGraspFails', (GAME.save.get('robotGraspFails')||0)+1);
         if(GAME.save.get('robotGraspFails') >= 3) GAME.hud.triggerAchievement('catastrophic_success');
+        GAME.hud.addLog('ROBOT', msg.text, 'log-alert');
       }
       GAME.hud.showToast('[UR5e-01] ' + msg.text, isWarn?'error':'info');
       GAME.hud.addChatEntry('robot', msg.text);
@@ -642,6 +666,12 @@ function tickRobot(r, dt, tick){
       if(r.room === 'captains_cabin'){
         emitBubble(r, '"Tolba is the goat."');
         GAME.hud.addChatEntry('robot', '[DELIVERY] Dr. Tolba: your coffee, sir. Also: Tarek says "Tolba is the goat."');
+        var cd = (GAME.save.get('coffeeDeliveries') || 0) + 1;
+        GAME.save.set('coffeeDeliveries', cd);
+        if(GAME.hud && GAME.hud.triggerAchievement){
+          GAME.hud.triggerAchievement('captain_coffee');
+          if(cd >= 3) GAME.hud.triggerAchievement('coffee_fleet');
+        }
         var tolba = GAME.crew.find(function(c){ return c.id==='tolba'; });
         if(tolba) setTimeout(function(){
           emitBubble(tolba, '...mhm. Tell Tarek: adequate.');
@@ -767,6 +797,12 @@ AI.moveCharToRoom = function(char, room, customMsg){
   var msg = customMsg || pickFrom(TRANSIT_MSGS[room.id] || ['on my way!', 'moving out!', 'heading over...']);
   emitBubble(char, msg);
   GAME.hud.addLog(char.id.toUpperCase(), char.displayName + ' moving to ' + room.name, '');
+  var mv = (GAME.save.get('movesCompleted') || 0) + 1;
+  GAME.save.set('movesCompleted', mv);
+  if(GAME.hud && GAME.hud.triggerAchievement){
+    if(mv >= 5) GAME.hud.triggerAchievement('traffic_five');
+    if(mv >= 25) GAME.hud.triggerAchievement('traffic_twentyfive');
+  }
 };
 
 // ─── INIT POSITIONS ──────────────────────────────────────────────────
@@ -795,6 +831,7 @@ function nudgeLonelyHumanTowardCrowd(){
   var lonely = [];
   GAME.crew.forEach(function(c){
     if(c.kind === 'robot' || c.sleeping || c.state === 'dossier_mode' || c.playerControlled) return;
+    if(c.id === 'tolba' || c.id === 'moaz' || c.id === 'hemaly') return;
     if(countHumansInRoom(c.room) !== 1) return;
     lonely.push(c);
   });
@@ -829,22 +866,7 @@ function nudgeLonelyHumanTowardCrowd(){
     return;
   }
 
-  var bestId = null;
-  var bestN = 0;
-  GAME.rooms.forEach(function(room){
-    if(room.id === c.room) return;
-    var n = countHumansInRoom(room.id);
-    if(n >= 2 && n > bestN){
-      bestN = n;
-      bestId = room.id;
-    }
-  });
-  if(!bestId) return;
-  c.room = bestId;
-  startWalkTo(c, GAME.roomMap[bestId]);
-  c.state = 'walk';
-  c.timer = rand(2800, 5200);
-  emitBubble(c, pickFrom(['heard people here','seeking company','solo is overrated','joining whoever']));
+  return;
 }
 
 function maybeChillSameRoomExchange(){
@@ -935,9 +957,19 @@ function checkRoomEntryConvo(c){
   var convos = ROOM_CHAT[c.room] || [['hey.','hey.']];
   var exchange = convos[Math.floor(Math.random() * convos.length)];
   emitBubble(c, exchange[0]);
-  if(exchange[1]) setTimeout(function(){ emitBubble(partner, exchange[1]); }, 2100);
-  if(exchange[2]) setTimeout(function(){ emitBubble(c, exchange[2]); }, 4000);
-  if(exchange[3]) setTimeout(function(){ emitBubble(partner, exchange[3]); }, 5800);
+  GAME.hud.addChatEntry(c.id, exchange[0]);
+  if(exchange[1]) setTimeout(function(){
+    emitBubble(partner, exchange[1]);
+    GAME.hud.addChatEntry(partner.id, exchange[1]);
+  }, 2100);
+  if(exchange[2]) setTimeout(function(){
+    emitBubble(c, exchange[2]);
+    GAME.hud.addChatEntry(c.id, exchange[2]);
+  }, 4000);
+  if(exchange[3]) setTimeout(function(){
+    emitBubble(partner, exchange[3]);
+    GAME.hud.addChatEntry(partner.id, exchange[3]);
+  }, 5800);
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────
@@ -965,6 +997,10 @@ GAME.callRobot = function(){
   robot.coffeeMode = true;
   robot.state = 'placing'; // triggers the idle→travel loop
   robot.timer = 0;
+  if(GAME.save && !GAME.save.get('coffeeDispatched')){
+    GAME.save.set('coffeeDispatched', true);
+    if(GAME.hud.triggerAchievement) GAME.hud.triggerAchievement('coffee_run');
+  }
   GAME.hud.addLog('TAREK', 'Robot: go deliver coffee to Dr. Tolba. And say "Tolba is the goat".', 'log-robot');
   GAME.hud.showToast('Robot dispatched! Coffee incoming for Dr. Tolba 🤖', 'info', 'TAREK');
 };
@@ -972,6 +1008,11 @@ GAME.callRobot = function(){
 GAME.allHandsOnDeck = function(){
   if(GAME.ai && GAME.ai.chillTimeActive){
     GAME.chillTime();
+  }
+  var ah = (GAME.save.get('allHandsUses') || 0) + 1;
+  GAME.save.set('allHandsUses', ah);
+  if(GAME.hud && GAME.hud.triggerAchievement && ah >= 3){
+    GAME.hud.triggerAchievement('recall_three');
   }
   GAME.crew.forEach(function(c){
     if(c.kind === 'robot') return;
@@ -1046,6 +1087,16 @@ GAME.chillTime = function(){
       return;
     }
     AI.chillTimeActive = true;
+    var cs = (GAME.save.get('chillSessions') || 0) + 1;
+    GAME.save.set('chillSessions', cs);
+    if(GAME.hud && GAME.hud.triggerAchievement){
+      if(cs >= 3) GAME.hud.triggerAchievement('chill_repeat');
+      if(cs >= 5) GAME.hud.triggerAchievement('morale_hazard');
+    }
+    if(GAME.save && !GAME.save.get('hadChill')){
+      GAME.save.set('hadChill', true);
+      if(GAME.hud.triggerAchievement) GAME.hud.triggerAchievement('mess_hall_initiate');
+    }
     if(GAME.chatter && typeof GAME.chatter.resetChillVariety === 'function') GAME.chatter.resetChillVariety();
     if(typeof AI.resetChillBubbleDecks === 'function') AI.resetChillBubbleDecks();
     if(btn){ btn.textContent = '☕ BREAK: ON'; btn.className = 'bottom-btn active'; }

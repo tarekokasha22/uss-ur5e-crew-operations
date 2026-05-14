@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# One-click: serve USS UR5e locally and open the bridge in your browser.
+set -e
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+PORT="${PORT:-8891}"
+URL="http://127.0.0.1:${PORT}/index.html"
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "This project needs python3 (for: python3 -m http.server)." >&2
+  exit 1
+fi
+
+if command -v xdg-open >/dev/null 2>&1; then
+  ( sleep 0.7; xdg-open "$URL" ) &
+elif command -v open >/dev/null 2>&1; then
+  ( sleep 0.7; open "$URL" ) &
+fi
+
+echo "USS UR5e — Crew Operations"
+echo "Serving: $URL"
+echo "Press Ctrl+C to stop the server."
+exec npx --yes serve -l 8765

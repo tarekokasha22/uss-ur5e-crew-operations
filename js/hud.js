@@ -5,11 +5,25 @@ const H = GAME.hud = {};
 // ─── ACHIEVEMENTS DATA ───────────────────────────────────────────────
 H.ACHIEVEMENTS = {
   first_contact:       { title:'FIRST CONTACT',        sub:'You clicked a crew member.' },
+  triple_file:         { title:'TRIPLE FILE',          sub:'Opened 3 classified dossiers. The ship trusts you slightly less.' },
+  seven_windows:       { title:'SEVEN WINDOWS',      sub:'Seven crew files accessed. Maryam has been notified.' },
   roll_call:           { title:'ROLL CALL',             sub:'All 14 crew files accessed.' },
   insomniac:           { title:'INSOMNIAC',             sub:'Opened a dossier at night. Suspicious.' },
   catastrophic_success:{ title:'CATASTROPHIC SUCCESS',  sub:'Witnessed 3 robot grasp fails.' },
   its_alive:           { title:"IT'S ALIVE",            sub:'Returned to the ship 3 days in a row.' },
   night_owl:           { title:'NIGHT OWL',             sub:'Still here after midnight?' },
+  coffee_run:          { title:'COFFEE RUN',            sub:'Dispatched UR5e-01 on the Tolba coffee protocol.' },
+  captain_coffee:      { title:"CAPTAIN'S CUP",        sub:'Robot completed delivery. Tolba rated it: adequate.' },
+  mess_hall_initiate:  { title:'MORALE EVENT',          sub:'First sanctioned ☕ chill — logs will never recover.' },
+  chill_repeat:        { title:'RECREATION LOOP',       sub:'Started ☕ chill 3 times. HR has questions.' },
+  morale_hazard:       { title:'MORALE HAZARD',         sub:'Five chill sessions. The mess hall is now a jurisdiction.' },
+  traffic_five:        { title:'TRAFFIC CONTROL',       sub:'5 manual crew relocations. You are officially traffic.' },
+  traffic_twentyfive:  { title:'DECK ARCHITECT',        sub:'25 relocations. The ship is your spreadsheet now.' },
+  recall_three:        { title:'GENERAL QUARTERS',      sub:'ALL HANDS 3 times. Jomana approves the panic.' },
+  first_orbit:         { title:'FIRST ORBIT',           sub:'2 minutes on station — the ship noticed you.' },
+  deep_space_watch:    { title:'DEEP SPACE WATCH',      sub:'10 minutes logged. Coffee debt: incalculable.' },
+  systems_tour:        { title:'SYSTEMS TOUR',          sub:'Tagged 10 unique deck fixtures. You read the labels. Respect.' },
+  coffee_fleet:        { title:'COFFEE FLEET',          sub:'Three Tolba coffee runs completed. The robot has seniority now.' },
   konami_master:       { title:'KONAMI MASTER',         sub:'You remembered. The ship remembers too.' },
 };
 
@@ -114,6 +128,21 @@ H.showToast = function(text, type='info', title='[UR5e-01]'){
   const container = document.getElementById('toast-container');
   if(!container) return;
 
+  const banner = document.getElementById('alert-banner');
+  if(banner){
+    if(type === 'error'){
+      banner.textContent = '⚠ ' + (title ? title + ': ' : '') + String(text).slice(0, 120);
+      banner.classList.add('visible');
+      clearTimeout(H._alertBannerTimer);
+      H._alertBannerTimer = setTimeout(function(){
+        banner.classList.remove('visible');
+      }, 5200);
+    } else {
+      clearTimeout(H._alertBannerTimer);
+      banner.classList.remove('visible');
+    }
+  }
+
   const existing = container.querySelectorAll('.toast');
   if(existing.length >= 3){
     const oldest = existing[0];
@@ -180,6 +209,10 @@ H.openDossier = function(charId){
   if(GAME.save.getClickedCrewCount() >= GAME.crew.length){
     H.triggerAchievement('roll_call');
   }
+
+  const dossN = GAME.save.getClickedCrewCount();
+  if(dossN >= 3) H.triggerAchievement('triple_file');
+  if(dossN >= 7) H.triggerAchievement('seven_windows');
 
   // Night insomniac
   if(GAME.state && GAME.state.isNight){
@@ -307,47 +340,62 @@ H.toggleAudio = function(){
   if(on) GAME.audio.play('click');
 };
 
-// ─── KONAMI EASTER EGG ───────────────────────────────────────────────
+// ─── KONAMI / CLASSIFIED CREDITS (button + keyboard) — own modal, repeatable ──
+H.closeKonamiCredits = function(){
+  const km = document.getElementById('konami-modal');
+  if(km) km.classList.remove('visible');
+};
+
+H.showKonamiCredits = function(){
+  try { GAME.hud.closeDossier(); } catch(e){}
+  try { GAME.audio.play('konami'); } catch(e){}
+
+  const firstEver = !GAME.save.get('konami');
+  if(firstEver){
+    GAME.save.set('konami', true);
+    H.triggerAchievement('konami_master');
+    H.addLog('???', 'KONAMI ACCESS — classified credits loaded.', 'log-success');
+  }
+
+  const wrap = document.getElementById('konami-modal');
+  const inner = document.getElementById('konami-dialog-content');
+  if(!wrap || !inner){
+    const overlay = document.getElementById('modal-overlay');
+    const modal = document.getElementById('dossier-modal');
+    if(overlay && modal){
+      modal.innerHTML = '<div class="dossier-header"><span class="dossier-header-title">CLASSIFIED // KONAMI</span><button class="dossier-close" onclick="GAME.hud.closeDossier()">✕ CLOSE</button></div><div class="dossier-body" style="padding:20px;text-align:center;color:#2a1a08">Konami UI missing — reload the page.</div>';
+      overlay.classList.add('visible');
+    }
+    return;
+  }
+
+  inner.innerHTML =
+    '<div class="konami-topbar">' +
+    '<span>CLASSIFIED // KONAMI</span>' +
+    '<button type="button" class="konami-close" onclick="GAME.hud.closeKonamiCredits()">✕ CLOSE</button>' +
+    '</div>' +
+    '<div class="konami-body">' +
+    '<h3>USS UR5e — CLASSIFIED CREDITS</h3>' +
+    '<div class="konami-credits">' +
+    '<strong>ROS2 Humble</strong> — Voice team build pipeline<br>' +
+    '<strong>MoveIt2</strong> — Motion planned by Moaz &amp; Hemaly<br>' +
+    '<strong>Hardware</strong> — Hemaly bench reality<br>' +
+    '<strong>Voice stack</strong> — Tarek, Abdelrahman, Mohamed<br>' +
+    '<strong>Comms</strong> — Carol (Gerald Jr. is still in the logs)<br>' +
+    '<strong>Structure</strong> — Omar, Seif, Youssef Emad<br>' +
+    '<strong>Command</strong> — Jomana (non-negotiable)<br>' +
+    '<strong>Logistics</strong> — Maryam (already filed this credit scroll)<br>' +
+    '<strong>Patron lane</strong> — Youssef Zaky &amp; the 7-year plant<br>' +
+    '<strong>Wisdom</strong> — Dr. Tolba (MATLAB is a way of life)<br><br>' +
+    '<em>UR5e-01 says: pick, place, peace.</em><br><br>' +
+    '<strong style="color:#00ff88">GIU Robotics — USS UR5e Crew Operations</strong>' +
+    '</div></div>';
+
+  wrap.classList.add('visible');
+};
+
 H.triggerKonami = function(){
-  if(GAME.save.get('konami')) return;
-  GAME.save.set('konami', true);
-  GAME.audio.play('konami');
-  H.triggerAchievement('konami_master');
-  H.addLog('???', 'KONAMI CODE ACTIVATED. Good morning, operator.', 'log-success');
-
-  const overlay = document.getElementById('modal-overlay');
-  const modal = document.getElementById('dossier-modal');
-  if(!overlay || !modal) return;
-
-  modal.innerHTML = `
-    <div class="dossier-header">
-      <span class="dossier-header-title">CLASSIFIED // KONAMI ACCESS GRANTED</span>
-      <button class="dossier-close" onclick="GAME.hud.closeDossier()">✕ CLOSE</button>
-    </div>
-    <div class="dossier-body" style="text-align:center;padding:30px">
-      <div style="font-family:'VT323',monospace;font-size:1.5rem;color:#00ff88;margin-bottom:20px;letter-spacing:0.2em">
-        USS UR5e — CLASSIFIED CREDITS
-      </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:0.75rem;color:#2a1a08;line-height:2">
-        <strong>ROS2 Humble</strong> — Compiled with love by the Voice Team<br>
-        <strong>MoveIt2</strong> — Motion planned by Moaz & Hemaly<br>
-        <strong>Hardware</strong> — Built and soldered by Hemaly<br>
-        <strong>Voice System</strong> — Trained by Tarek, Abdelrahman, Mohamed<br>
-        <strong>Operations</strong> — Controlled by Carol<br>
-        <strong>Structure</strong> — Designed by Omar, Seif, Youssef Emad<br>
-        <strong>Command</strong> — Jomana. (non-negotiable)<br>
-        <strong>Logistics</strong> — Maryam (she already handled it)<br>
-        <strong>Funding</strong> — Youssef Zaky (the plant thanks you)<br>
-        <strong>Wisdom</strong> — Dr. Tolba (in MATLAB we trust)<br>
-        <br>
-        <em>Robot built, trained, and occasionally argued with.</em><br>
-        <em>No robots were harmed. The robot is fine. The robot says hi.</em><br>
-        <br>
-        <strong style="color:#8b4513">GIU Robotics Project — Spring 2026</strong>
-      </div>
-    </div>
-  `;
-  overlay.classList.add('visible');
+  H.showKonamiCredits();
 };
 
 // ─── HUD BAR UPDATE ───────────────────────────────────────────────────
@@ -358,11 +406,131 @@ H.updateHUD = function(missionDay, gameHour, isNight){
   const modeEl = document.getElementById('hud-mode');
 
   if(dayEl) dayEl.textContent = `DAY ${String(missionDay).padStart(3,'0')}`;
-  if(uptimeEl) uptimeEl.textContent = `${String(gameHour).padStart(2,'0')}:${String(Math.floor((Date.now()/1000)%60)).padStart(2,'0')}`;
+  if(uptimeEl){
+    const acc = (GAME.state && GAME.state.shipSimMs) || 0;
+    const totalM = Math.floor(acc / 9000);
+    const sh = (8 + Math.floor(totalM / 60)) % 24;
+    const smin = totalM % 60;
+    uptimeEl.textContent = `${String(sh).padStart(2,'0')}:${String(smin).padStart(2,'0')}`;
+  }
   if(crewEl) crewEl.textContent = `${GAME.crew.length}/${GAME.crew.length}`;
   if(modeEl){
     modeEl.textContent = isNight ? '🌙 NIGHT' : '☀ DAY';
     modeEl.className = `hud-stat-value ${isNight?'':'green'}`;
+  }
+
+  const achIds = Object.keys(H.ACHIEVEMENTS);
+  let unlocked = 0;
+  achIds.forEach(function(id){ if(GAME.save.hasAchievement(id)) unlocked++; });
+  const kpiAch = document.getElementById('kpi-ach');
+  const kpiDos = document.getElementById('kpi-dossier');
+  const kpiRob = document.getElementById('kpi-robot');
+  if(kpiAch) kpiAch.textContent = 'ACH ' + unlocked + '/' + achIds.length;
+  if(kpiDos) kpiDos.textContent = 'DOSSIER ' + (typeof GAME.save.getClickedCrewCount === 'function' ? GAME.save.getClickedCrewCount() : 0) + '/14';
+  if(kpiRob) kpiRob.textContent = 'GRASP FAILS ' + (GAME.save.get('robotGraspFails') || 0);
+
+  if(GAME.state && GAME.state.shipSimMs >= 120000) H.triggerAchievement('first_orbit');
+  if(GAME.state && GAME.state.shipSimMs >= 600000) H.triggerAchievement('deep_space_watch');
+};
+
+// ─── ROOM NAME OVERLAY (HTML — always readable above canvas) ────────
+H.initRoomLabels = function(){
+  const layer = document.getElementById('room-labels-layer');
+  if(!layer || !GAME.rooms || !GAME.LAYOUT || !GAME.getRoomCell) return;
+  const L = GAME.LAYOUT;
+  layer.innerHTML = '';
+  GAME.rooms.forEach(function(room){
+    const cell = GAME.getRoomCell(room);
+    const el = document.createElement('div');
+    el.className = 'room-chip';
+    const glow = (room.colors && room.colors.glow) ? room.colors.glow : '#00d4ff';
+    el.style.setProperty('--room-glow', glow);
+    el.style.setProperty('--room-accent', (room.colors && room.colors.accent) ? room.colors.accent : glow);
+    if(room.colors && room.colors.border) el.style.borderColor = room.colors.border;
+    const icon = room.icon ? String(room.icon) : '◆';
+    const sub = room.subtitle ? escapeHtml(room.subtitle) : '';
+    el.innerHTML =
+      '<span class="room-chip-icon" aria-hidden="true">' + escapeHtml(icon) + '</span>' +
+      '<div class="room-chip-text">' +
+      '<span class="room-chip-title">' + escapeHtml(room.name) + '</span>' +
+      (sub ? '<span class="room-chip-sub">' + sub + '</span>' : '') +
+      '</div>';
+    const pctLeft = ((cell.x + cell.w / 2) / L.LOGICAL_W) * 100;
+    const pctTop = ((cell.y + 8) / L.LOGICAL_H) * 100;
+    el.style.left = pctLeft + '%';
+    el.style.top = pctTop + '%';
+    layer.appendChild(el);
+  });
+};
+
+// ─── OPS CENTER (guide + achievements + KPIs) ───────────────────────
+H.openOps = function(){
+  if(GAME.hud.closeKonamiCredits) GAME.hud.closeKonamiCredits();
+  const m = document.getElementById('ops-modal');
+  if(!m) return;
+  m.classList.add('visible');
+  H.switchOpsTab('guide');
+  try {
+    H.refreshOpsPanels();
+  } catch(err){
+    console.warn('openOps', err);
+  }
+};
+
+H.closeOps = function(){
+  const m = document.getElementById('ops-modal');
+  if(m) m.classList.remove('visible');
+};
+
+H.switchOpsTab = function(which){
+  document.querySelectorAll('.ops-tab').forEach(function(t){
+    t.classList.toggle('active', t.getAttribute('data-ops') === which);
+  });
+  document.querySelectorAll('.ops-panel').forEach(function(p){
+    p.classList.toggle('active', p.id === 'ops-panel-' + which);
+  });
+};
+
+H.refreshOpsPanels = function(){
+  const list = document.getElementById('ops-ach-list');
+  if(list){
+    let html = '';
+    Object.keys(H.ACHIEVEMENTS).forEach(function(id){
+      const a = H.ACHIEVEMENTS[id];
+      const ok = GAME.save.hasAchievement(id);
+      html += '<div class="ops-ach-row' + (ok ? ' unlocked' : '') + '">' +
+        '<span class="ops-ach-mark">' + (ok ? '●' : '○') + '</span>' +
+        '<div><div class="ops-ach-title">' + escapeHtml(a.title) + '</div>' +
+        '<div class="ops-ach-sub">' + escapeHtml(a.sub) + '</div></div></div>';
+    });
+    list.innerHTML = html;
+  }
+  const kpi = document.getElementById('ops-kpi-body');
+  if(kpi){
+    const achN = Object.keys(H.ACHIEVEMENTS).filter(function(id){ return GAME.save.hasAchievement(id); }).length;
+    const doss = typeof GAME.save.getClickedCrewCount === 'function' ? GAME.save.getClickedCrewCount() : 0;
+    const fails = GAME.save.get('robotGraspFails') || 0;
+    const days = GAME.save.get('totalDays') || 1;
+    const md = (GAME.state && GAME.state.missionDay) || GAME.save.get('missionDay') || 1;
+    const moves = GAME.save.get('movesCompleted') || 0;
+    const chills = GAME.save.get('chillSessions') || 0;
+    const recalls = GAME.save.get('allHandsUses') || 0;
+    const coffees = GAME.save.get('coffeeDeliveries') || 0;
+    const decorN = (GAME.save.get('decorSeenKeys') && GAME.save.get('decorSeenKeys').length) || 0;
+    kpi.innerHTML =
+      '<table class="ops-kpi-table">' +
+      '<tr><td>Mission day (sim)</td><td>' + md + '</td></tr>' +
+      '<tr><td>Calendar days aboard</td><td>' + days + '</td></tr>' +
+      '<tr><td>Achievements</td><td>' + achN + ' / ' + Object.keys(H.ACHIEVEMENTS).length + '</td></tr>' +
+      '<tr><td>Dossiers opened (unique)</td><td>' + doss + ' / 14</td></tr>' +
+      '<tr><td>Robot grasp fails (log)</td><td>' + fails + '</td></tr>' +
+      '<tr><td>Tolba coffee runs completed</td><td>' + coffees + '</td></tr>' +
+      '<tr><td>Unique fixtures inspected (hover)</td><td>' + decorN + '</td></tr>' +
+      '<tr><td>MOVE CREW relocations</td><td>' + moves + '</td></tr>' +
+      '<tr><td>☕ Chill sessions started</td><td>' + chills + '</td></tr>' +
+      '<tr><td>ALL HANDS uses</td><td>' + recalls + '</td></tr>' +
+      '<tr><td>Ship clock</td><td>~9s real time = 1 ship minute</td></tr>' +
+      '</table>';
   }
 };
 

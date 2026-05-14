@@ -16,6 +16,13 @@ const defaults = {
   konami: false,
   nightMode: false,
   missionDay: 1,
+  hadChill: false,
+  coffeeDispatched: false,
+  coffeeDeliveries: 0,
+  movesCompleted: 0,
+  chillSessions: 0,
+  allHandsUses: 0,
+  decorSeenKeys: [],
 };
 
 let state = null;
