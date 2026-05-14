@@ -871,18 +871,27 @@ function drawCorridors(pulse, tick){
   // Vertical corridors
   for(var col=0; col<L.COLS-1; col++){
     var cx = col * (L.CELL_W + L.CORRIDOR_W) + L.CELL_W;
-    // Floor base
-    ctx.fillStyle = '#060e15';
+    
+    // Space depth under floor
+    ctx.fillStyle = 'rgba(0,2,5,0.6)';
     ctx.fillRect(cx, L.TOP_BAR, L.CORRIDOR_W, playH);
-    // Floor tiles
-    ctx.fillStyle = '#0a1622';
+    for(var st=0; st<40; st++){
+      var sx = cx + 2 + ((st*31+tick*0.2)% (L.CORRIDOR_W-4));
+      var sy = L.TOP_BAR + ((st*73+tick*2)% playH);
+      var sa = 0.2 + 0.6*Math.sin(tick*0.05 + st);
+      ctx.fillStyle = 'rgba(180,220,255,'+sa.toFixed(2)+')';
+      ctx.fillRect(sx,sy, st%5===0?2:1, st%5===0?2:1);
+    }
+    
+    // Glass floor tiles
+    ctx.fillStyle = 'rgba(10,22,34,0.4)';
     for(var ty=L.TOP_BAR; ty<L.TOP_BAR+playH; ty+=16){
       ctx.fillRect(cx+2, ty+2, L.CORRIDOR_W-4, 12);
       // Bevel depth
-      ctx.fillStyle = '#03080e';
+      ctx.fillStyle = 'rgba(3,8,14,0.7)';
       ctx.fillRect(cx+L.CORRIDOR_W-2, ty+2, 1, 12);
       ctx.fillRect(cx+2, ty+14, L.CORRIDOR_W-4, 1);
-      ctx.fillStyle = '#0a1622';
+      ctx.fillStyle = 'rgba(10,22,34,0.4)';
     }
     // Chevron markings
     ctx.fillStyle = 'rgba(255,200,0,0.15)';
@@ -927,16 +936,26 @@ function drawCorridors(pulse, tick){
   // Horizontal corridors
   for(var row2=0; row2<L.ROWS-1; row2++){
     var cy2 = L.TOP_BAR + row2 * (L.CELL_H + L.CORRIDOR_H) + L.CELL_H;
-    ctx.fillStyle = '#060e15';
+    
+    // Space depth under floor
+    ctx.fillStyle = 'rgba(0,2,5,0.6)';
     ctx.fillRect(0, cy2, L.LOGICAL_W, L.CORRIDOR_H);
-    // Floor tiles
-    ctx.fillStyle = '#0a1622';
+    for(var st2=0; st2<60; st2++){
+      var sx2 = ((st2*43+tick*1.5)% L.LOGICAL_W);
+      var sy2 = cy2 + 2 + ((st2*19+tick*0.1)% (L.CORRIDOR_H-4));
+      var sa2 = 0.2 + 0.6*Math.sin(tick*0.06 + st2);
+      ctx.fillStyle = 'rgba(180,220,255,'+sa2.toFixed(2)+')';
+      ctx.fillRect(sx2,sy2, st2%4===0?2:1, 1);
+    }
+    
+    // Glass floor tiles
+    ctx.fillStyle = 'rgba(10,22,34,0.4)';
     for(var tx=0; tx<L.LOGICAL_W; tx+=16){
       ctx.fillRect(tx+2, cy2+2, 12, L.CORRIDOR_H-4);
-      ctx.fillStyle = '#03080e';
+      ctx.fillStyle = 'rgba(3,8,14,0.7)';
       ctx.fillRect(tx+14, cy2+2, 1, L.CORRIDOR_H-4);
       ctx.fillRect(tx+2, cy2+L.CORRIDOR_H-2, 12, 1);
-      ctx.fillStyle = '#0a1622';
+      ctx.fillStyle = 'rgba(10,22,34,0.4)';
     }
     // Chevron markings
     ctx.fillStyle = 'rgba(255,200,0,0.15)';

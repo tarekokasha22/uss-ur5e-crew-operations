@@ -933,54 +933,7 @@ P.drawRoom = function(ctx, room, rx, ry, rw, rh, pulse, tick){
 
   // Room titles are drawn in HTML (#room-labels-layer) so they stay crisp above all canvas layers.
 
-  // ── Vertical LED strips on side walls (enhanced) ─────────────────────
-  const ledTop = floorY + 8;
-  const ledBot = ry + rh - 16;
-  const ledH = ledBot - ledTop;
-  // Left strip
-  ctx.fillStyle = '#000';
-  ctx.fillRect(rx+2, ledTop, 5, ledH);
-  ctx.strokeStyle = rgba(c.border,0.3); ctx.strokeRect(rx+2, ledTop, 5, ledH);
-  for(let li=0; li<Math.floor(ledH/6); li++){
-    const ly = ledTop + li*6;
-    const on = Math.sin(tick/12 + li*0.4) > -0.2;
-    ctx.fillStyle = on ? c.accent : darken(c.accent, 0.4);
-    ctx.fillRect(rx+4, ly+1, 2, 3);
-    if(on){
-      ctx.fillStyle = rgba(c.accent, 0.4);
-      ctx.fillRect(rx+1, ly, 7, 5);
-    }
-  }
-  // Right strip
-  ctx.fillStyle = '#000';
-  ctx.fillRect(rx+rw-7, ledTop, 5, ledH);
-  ctx.strokeStyle = rgba(c.border,0.3); ctx.strokeRect(rx+rw-7, ledTop, 5, ledH);
-  for(let li2=0; li2<Math.floor(ledH/6); li2++){
-    const ly2 = ledTop + li2*6;
-    const on2 = Math.sin(tick/12 + li2*0.4 + 2) > -0.2;
-    ctx.fillStyle = on2 ? c.accent : darken(c.accent, 0.4);
-    ctx.fillRect(rx+rw-5, ly2+1, 2, 3);
-    if(on2){
-      ctx.fillStyle = rgba(c.accent, 0.4);
-      ctx.fillRect(rx+rw-8, ly2, 7, 5);
-    }
-  }
-  
-  // ── Floor Scanning Laser Grid ─────────────────────────────────────────
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(rx+8, floorY+8, rw-16, floorH-16);
-  ctx.clip();
-  const scanY = floorY + 8 + (tick*1.5 % (floorH-16));
-  const sGrad = ctx.createLinearGradient(0, scanY-10, 0, scanY+10);
-  sGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  sGrad.addColorStop(0.5, rgba(c.accent, 0.3));
-  sGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = sGrad;
-  ctx.fillRect(rx+8, scanY-10, rw-16, 20);
-  ctx.fillStyle = rgba(c.accent, 0.8);
-  ctx.fillRect(rx+8, scanY, rw-16, 1);
-  ctx.restore();
+
 
   // ── Floor circuit traces (subtle cyan grid lines) ───────────────────
   ctx.strokeStyle = rgba(c.glow, 0.18);
